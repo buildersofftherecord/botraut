@@ -2,7 +2,8 @@
 import { ImageResponse } from "@vercel/og";
 import { cargarFuentes } from "./fuentes/index";
 import { LIENZOS, type NombreLienzo } from "./lienzos";
-import { COLOR } from "./tokens";
+import { COLOR, FUENTE } from "./tokens";
+import { Esquinas, Etiqueta, PuntoRec } from "./Hud";
 import type { DatosPlaca } from "../lib/tipos";
 
 export const DATOS_DEMO: DatosPlaca = {
@@ -44,8 +45,43 @@ export async function renderizar(
           height: l.alto,
           background: COLOR.negro,
           position: "relative",
+          fontFamily: FUENTE.mono,
         }}
-      />
+      >
+        <Esquinas lienzo={l} />
+
+        {/* REC, arriba a la izquierda */}
+        <div
+          style={{
+            position: "absolute",
+            top: l.margen + 8,
+            left: l.margen + 28,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <Etiqueta>REC</Etiqueta>
+          <PuntoRec />
+        </div>
+
+        {/* Timecode y cámara, arriba a la derecha. Decorativos y fijos: un
+            timecode que cambiara por placa rompería el determinismo. */}
+        <div
+          style={{
+            position: "absolute",
+            top: l.margen + 8,
+            right: l.margen + 28,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: 6,
+          }}
+        >
+          <Etiqueta>00:00:07:21</Etiqueta>
+          <Etiqueta color={COLOR.t55}>CAM 01</Etiqueta>
+        </div>
+      </div>
     ),
     { width: l.ancho, height: l.alto, fonts: fuentes },
   );
