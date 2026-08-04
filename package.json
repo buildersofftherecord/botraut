@@ -11,6 +11,7 @@
   },
   "type": "module",
   "dependencies": {
+    "@ai-sdk/google": "^4.0.33",
     "@chat-adapter/slack": "^4.36.0",
     "@chat-adapter/state-redis": "^4.36.0",
     "@vercel/blob": "^2.6.1",
