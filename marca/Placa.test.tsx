@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { renderizar, DATOS_DEMO, tamanoNombre } from "./Placa";
+import { renderizar, DATOS_DEMO } from "./Placa";
+import { tamanoNombre } from "./medirNombre";
 import { pixelEn, medidas, regionTieneClaros } from "../test/pixel";
 import { etiquetaInvitado } from "../lib/tipos";
 import { LIENZOS } from "./lienzos";
@@ -76,19 +77,30 @@ describe("bloque de tipografía", () => {
 describe("tamanoNombre", () => {
   // Satori no corta una palabra a mitad de línea, así que si la palabra más
   // larga del nombre no entra al techo de diseño, hay que achicar la fuente
-  // en vez de dejar que el texto se salga del contenedor.
+  // en vez de dejar que el texto se salga del contenedor. El ancho se mide
+  // con la fuente real (@shuding/opentype.js), no con un promedio por
+  // caracter: por eso "María" y "Muñoz" -- misma longitud, 5 caracteres --
+  // no dan el mismo resultado.
   const l = LIENZOS["1:1"];
   const anchoColumna = l.ancho * (1 - l.fotoAncho) - l.margen - 40;
 
-  it("usa el techo de diseño cuando la palabra más larga entra sin achicar", () => {
-    expect(tamanoNombre("Ana Li", anchoColumna, l.nombreTamano)).toBe(l.nombreTamano);
+  it("usa el techo de diseño cuando la palabra más larga entra sin achicar", async () => {
+    expect(await tamanoNombre("Ana Li", anchoColumna, l.nombreTamano)).toBe(l.nombreTamano);
   });
 
-  it("achica más la fuente cuanto más larga es la palabra más larga", () => {
-    const paraNombreCorto = tamanoNombre("Naomi Couriel", anchoColumna, l.nombreTamano);
-    const paraNombreLargo = tamanoNombre("Guillermo Rauch", anchoColumna, l.nombreTamano);
+  it("achica más la fuente cuanto más larga es la palabra más larga", async () => {
+    const paraNombreCorto = await tamanoNombre("Naomi Couriel", anchoColumna, l.nombreTamano);
+    const paraNombreLargo = await tamanoNombre("Guillermo Rauch", anchoColumna, l.nombreTamano);
     expect(paraNombreLargo).toBeLessThan(paraNombreCorto);
     expect(paraNombreLargo).toBeLessThan(l.nombreTamano);
+  });
+
+  it("distingue el ancho real en píxeles, no la cuenta de caracteres", async () => {
+    // "María" y "Muñoz" tienen los dos 5 caracteres; un promedio por
+    // caracter les daría el mismo tamaño. La fuente real no.
+    const conMaria = await tamanoNombre("María", anchoColumna, l.nombreTamano);
+    const conMunoz = await tamanoNombre("Muñoz", anchoColumna, l.nombreTamano);
+    expect(conMaria).not.toBe(conMunoz);
   });
 });
 
@@ -98,9 +110,18 @@ describe("el nombre nunca invade la columna reservada para la foto", () => {
   // Task 10 va a ocupar con la foto.
   const zonaFoto = Math.round(l.ancho * (1 - l.fotoAncho));
 
-  // Dos nombres de largo muy distinto -- "Guillermo Rauch" es el caso peor
-  // citado en lib/tipos.ts, no uno inventado acá.
-  it.each([["Naomi Couriel"], ["Guillermo Rauch"]])(
+  // "Guillermo Rauch" es el caso peor citado en lib/tipos.ts. Los tres
+  // nombres acentuados y la palabra de 24 M son los que la revisión de
+  // Round 2 encontró desbordando con el estimador por caracter: una M o una
+  // Ñ ocupan más que el ancho medio que asumía ANCHO_GLYPH_NOMBRE.
+  it.each([
+    ["Naomi Couriel"],
+    ["Guillermo Rauch"],
+    ["José María Muñoz"],
+    ["Íñigo Márquez"],
+    ["Ñandú Ñáñez"],
+    ["MMMMMMMMMMMMMMMMMMMMMMMM"],
+  ])(
     "ningún píxel del bloque de tipografía cruza la frontera con \"%s\"",
     async (nombre) => {
       const datos = { ...DATOS_DEMO, invitado: { ...DATOS_DEMO.invitado, nombre } };
