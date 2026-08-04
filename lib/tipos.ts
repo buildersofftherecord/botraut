@@ -2,9 +2,14 @@ import { z } from "zod";
 
 /**
  * Los límites de caracteres no son validación defensiva: son las medidas del
- * template. `nombre` sale de que "GUILLERMO RAUCH" ocupa dos líneas al cuerpo
- * de `LIENZOS["1:1"].nombreTamano`. El modelo recibe estos límites en el
- * prompt y se ajusta solo.
+ * template. `nombre` sale de que "GUILLERMO RAUCH" es el caso peor que el
+ * template soporta bien: dos palabras de hasta 9-10 letras, que ocupan dos
+ * líneas. `Placa.tsx` (`tamanoNombre()`) achica la fuente por debajo de
+ * `LIENZOS["1:1"].nombreTamano` cuando hace falta para que la palabra más
+ * larga no desborde la columna hacia la foto — un nombre de una sola palabra
+ * de 24 caracteres sin espacios entraría igual, pero minúsculo, porque ese
+ * caso no es el que el límite fue pensado para cubrir. El modelo recibe
+ * estos límites en el prompt y se ajusta solo.
  */
 export const InvitadoSchema = z.object({
   nombre: z.string().min(1).max(24),

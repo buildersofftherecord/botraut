@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { renderizar, DATOS_DEMO } from "./Placa";
-import { pixelEn, medidas } from "../test/pixel";
+import { renderizar, DATOS_DEMO, tamanoNombre } from "./Placa";
+import { pixelEn, medidas, regionTieneClaros } from "../test/pixel";
 import { etiquetaInvitado } from "../lib/tipos";
+import { LIENZOS } from "./lienzos";
 
 describe("renderizar", () => {
   it("devuelve un PNG de 1080x1080", async () => {
@@ -70,4 +71,50 @@ describe("bloque de tipografía", () => {
     expect(etiquetaInvitado("m")).toBe("INVITADO");
     expect(etiquetaInvitado("x")).toBe("INVITADX");
   });
+});
+
+describe("tamanoNombre", () => {
+  // Satori no corta una palabra a mitad de línea, así que si la palabra más
+  // larga del nombre no entra al techo de diseño, hay que achicar la fuente
+  // en vez de dejar que el texto se salga del contenedor.
+  const l = LIENZOS["1:1"];
+  const anchoColumna = l.ancho * (1 - l.fotoAncho) - l.margen - 40;
+
+  it("usa el techo de diseño cuando la palabra más larga entra sin achicar", () => {
+    expect(tamanoNombre("Ana Li", anchoColumna, l.nombreTamano)).toBe(l.nombreTamano);
+  });
+
+  it("achica más la fuente cuanto más larga es la palabra más larga", () => {
+    const paraNombreCorto = tamanoNombre("Naomi Couriel", anchoColumna, l.nombreTamano);
+    const paraNombreLargo = tamanoNombre("Guillermo Rauch", anchoColumna, l.nombreTamano);
+    expect(paraNombreLargo).toBeLessThan(paraNombreCorto);
+    expect(paraNombreLargo).toBeLessThan(l.nombreTamano);
+  });
+});
+
+describe("el nombre nunca invade la columna reservada para la foto", () => {
+  const l = LIENZOS["1:1"];
+  // Frontera real del diseño: a la derecha de esto empieza el 48% que
+  // Task 10 va a ocupar con la foto.
+  const zonaFoto = Math.round(l.ancho * (1 - l.fotoAncho));
+
+  // Dos nombres de largo muy distinto -- "Guillermo Rauch" es el caso peor
+  // citado en lib/tipos.ts, no uno inventado acá.
+  it.each([["Naomi Couriel"], ["Guillermo Rauch"]])(
+    "ningún píxel del bloque de tipografía cruza la frontera con \"%s\"",
+    async (nombre) => {
+      const datos = { ...DATOS_DEMO, invitado: { ...DATOS_DEMO.invitado, nombre } };
+      const png = await renderizar(datos, "1:1");
+
+      // Franja vertical generosa que cubre etiqueta + nombre + rol sea cual
+      // sea el tamaño de fuente que termine eligiendo tamanoNombre().
+      const hayClaros = await regionTieneClaros(png, {
+        left: zonaFoto,
+        top: l.margen + 130,
+        width: l.ancho - zonaFoto - 1,
+        height: 300,
+      });
+      expect(hayClaros).toBe(false);
+    },
+  );
 });

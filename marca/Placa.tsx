@@ -25,6 +25,29 @@ export const DATOS_DEMO: DatosPlaca = {
 };
 
 /**
+ * Ancho medio de un glyph mayúscula de Archivo 900, como fracción del
+ * font-size. Medido renderizando el bloque a varios tamaños y comparando el
+ * píxel más a la derecha del texto contra el font-size usado (ver
+ * "el nombre nunca invade la columna de la foto" en Placa.test.tsx).
+ * Redondeado hacia arriba para dejar margen a glyphs anchos (M, W).
+ */
+const ANCHO_GLYPH_NOMBRE = 0.9;
+
+/**
+ * Satori no corta una palabra a mitad de línea: si la palabra más larga del
+ * nombre no entra en el ancho disponible al tamaño de diseño, sigue de largo
+ * más allá del contenedor en vez de ajustarse (así se descubrió el bug con
+ * "Guillermo Rauch" desbordando hacia la columna de la foto). Por eso el
+ * tamaño real es dinámico: se calcula el más grande que hace entrar la
+ * palabra más larga, sin superar el techo de diseño `tamanoMax`.
+ */
+export function tamanoNombre(nombre: string, anchoDisponible: number, tamanoMax: number): number {
+  const palabraMasLarga = Math.max(...nombre.split(" ").map((p) => p.length));
+  const maximoQueEntra = anchoDisponible / (palabraMasLarga * ANCHO_GLYPH_NOMBRE);
+  return Math.min(tamanoMax, Math.floor(maximoQueEntra));
+}
+
+/**
  * `fotoPng` viene ya recortada y en B/N: Satori no soporta `filter`, así que
  * toda transformación de imagen pasa por sharp antes de llegar acá.
  */
@@ -35,6 +58,7 @@ export async function renderizar(
 ): Promise<Buffer> {
   const l = LIENZOS[nombreLienzo];
   const fuentes = await cargarFuentes();
+  const anchoColumna = l.ancho * (1 - l.fotoAncho) - l.margen - 40;
 
   const respuesta = new ImageResponse(
     (
@@ -88,7 +112,7 @@ export async function renderizar(
             position: "absolute",
             top: l.margen + 130,
             left: l.margen + 28,
-            width: l.ancho * (1 - l.fotoAncho) - l.margen - 40,
+            width: anchoColumna,
             display: "flex",
             flexDirection: "column",
           }}
@@ -111,7 +135,7 @@ export async function renderizar(
             style={{
               display: "flex",
               fontFamily: FUENTE.display,
-              fontSize: l.nombreTamano,
+              fontSize: tamanoNombre(datos.invitado.nombre, anchoColumna, l.nombreTamano),
               lineHeight: 0.92,
               letterSpacing: "-0.01em",
               textTransform: "uppercase",
