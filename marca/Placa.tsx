@@ -4,7 +4,7 @@ import { cargarFuentes } from "./fuentes/index";
 import { LIENZOS, type NombreLienzo } from "./lienzos";
 import { COLOR, FUENTE } from "./tokens";
 import { Esquinas, Etiqueta, PuntoRec } from "./Hud";
-import type { DatosPlaca } from "../lib/tipos";
+import { etiquetaInvitado, type DatosPlaca } from "../lib/tipos";
 
 export const DATOS_DEMO: DatosPlaca = {
   invitado: {
@@ -80,6 +80,59 @@ export async function renderizar(
         >
           <Etiqueta>00:00:07:21</Etiqueta>
           <Etiqueta color={COLOR.t55}>CAM 01</Etiqueta>
+        </div>
+
+        {/* Columna izquierda: etiqueta, nombre, rol */}
+        <div
+          style={{
+            position: "absolute",
+            top: l.margen + 130,
+            left: l.margen + 28,
+            width: l.ancho * (1 - l.fotoAncho) - l.margen - 40,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <Etiqueta>{etiquetaInvitado(datos.invitado.genero)}</Etiqueta>
+
+          {/* La regla debajo de la etiqueta, como en .hud-label del sitio */}
+          <div
+            style={{
+              display: "flex",
+              width: 140,
+              height: 1,
+              background: COLOR.lineaViva,
+              marginTop: 14,
+              marginBottom: 34,
+            }}
+          />
+
+          <div
+            style={{
+              display: "flex",
+              fontFamily: FUENTE.display,
+              fontSize: l.nombreTamano,
+              lineHeight: 0.92,
+              letterSpacing: "-0.01em",
+              textTransform: "uppercase",
+              color: COLOR.blanco,
+            }}
+          >
+            {datos.invitado.nombre}
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              fontFamily: FUENTE.mono,
+              fontSize: l.rolTamano,
+              lineHeight: 1.5,
+              color: COLOR.t75,
+              marginTop: 30,
+            }}
+          >
+            {datos.invitado.rol}
+          </div>
         </div>
       </div>
     ),
