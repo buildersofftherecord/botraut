@@ -1,0 +1,35 @@
+{
+  "name": "botr-placas",
+  "version": "1.0.0",
+  "description": "Genera las placas de anuncio de invitados de Builders Off The Record desde Slack.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest run",
+    "placa": "tsx scripts/placa.tsx"
+  },
+  "type": "module",
+  "dependencies": {
+    "@chat-adapter/slack": "^4.36.0",
+    "@chat-adapter/state-redis": "^4.36.0",
+    "@vercel/blob": "^2.6.1",
+    "@vercel/og": "^0.11.1",
+    "ai": "^7.0.50",
+    "chat": "^4.36.0",
+    "next": "^16.3.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "sharp": "^0.35.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "tsx": "^4.23.5",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  },
+  "private": true
+}

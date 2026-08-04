@@ -1,0 +1,18 @@
+node_modules
+.next
+.env
+.env.local
+.vercel
+
+# Salidas del render local. Se miran, no se versionan.
+salidas/
+
+# Muestras y salidas de los spikes: material de trabajo, no del producto.
+spikes/muestras/
+spikes/salidas/
+
+*.tsbuildinfo
+
+# A diferencia de landing/, acá los .ttf SÍ se versionan: Satori los necesita
+# en runtime y un deploy sin fuente no renderiza.
+# Ver docs/superpowers/specs/2026-08-03-placas-design.md §4.
