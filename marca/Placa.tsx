@@ -1,4 +1,7 @@
 /** @jsxImportSource react */
+import { readFile } from "node:fs/promises";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { ImageResponse } from "@vercel/og";
 import { cargarFuentes } from "./fuentes/index";
 import { LIENZOS, type NombreLienzo } from "./lienzos";
@@ -7,6 +10,8 @@ import { Esquinas, Etiqueta, PuntoRec } from "./Hud";
 import { IconoCalendario, IconoReloj, IconoSenal } from "./Iconos";
 import { etiquetaInvitado, type DatosPlaca } from "../lib/tipos";
 import { tamanoNombre, NOMBRE_LETTER_SPACING_EM } from "./medirNombre";
+
+const aca = dirname(fileURLToPath(import.meta.url));
 
 export const DATOS_DEMO: DatosPlaca = {
   invitado: {
@@ -37,6 +42,7 @@ export async function renderizar(
 ): Promise<Buffer> {
   const l = LIENZOS[nombreLienzo];
   const anchoColumna = l.ancho * (1 - l.fotoAncho) - l.margen - 40;
+  const sticker = await readFile(join(aca, "svg", "botr-sticker.svg"));
   const [fuentes, tamanoDelNombre] = await Promise.all([
     cargarFuentes(),
     tamanoNombre(datos.invitado.nombre, anchoColumna, l.nombreTamano),
@@ -54,6 +60,24 @@ export async function renderizar(
           fontFamily: FUENTE.mono,
         }}
       >
+        {/* La foto: a sangre derecha, cortada abajo. Llega ya recortada y en
+            B/N desde lib/procesar.ts — Satori no soporta filter. Va primera
+            en el árbol para que el marco HUD y la tipografía pinten encima. */}
+        {fotoPng ? (
+          <img
+            src={`data:image/png;base64,${fotoPng.toString("base64")}`}
+            style={{
+              position: "absolute",
+              right: 0,
+              bottom: 0,
+              width: l.ancho * l.fotoAncho,
+              height: l.alto * 0.94,
+              objectFit: "cover",
+              objectPosition: "top center",
+            }}
+          />
+        ) : null}
+
         <Esquinas lienzo={l} />
 
         {/* REC, arriba a la izquierda */}
@@ -171,6 +195,19 @@ export async function renderizar(
             </div>
           ))}
         </div>
+
+        {/* El sticker: el wordmark con placa rotado -7°. Es una aplicación de
+            la marca, no el logo — ver landing/docs/marca.md. Va última en el
+            árbol para quedar por encima de la foto. */}
+        <img
+          src={`data:image/svg+xml;base64,${sticker.toString("base64")}`}
+          style={{
+            position: "absolute",
+            right: l.margen + 20,
+            bottom: l.margen + 24,
+            width: 320,
+          }}
+        />
       </div>
     ),
     { width: l.ancho, height: l.alto, fonts: fuentes },

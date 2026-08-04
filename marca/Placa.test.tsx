@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import sharp from "sharp";
 import { renderizar, DATOS_DEMO } from "./Placa";
 import { tamanoNombre } from "./medirNombre";
 import { pixelEn, medidas, regionTieneClaros } from "../test/pixel";
@@ -156,4 +157,33 @@ describe("el nombre nunca invade la columna reservada para la foto", () => {
       expect(hayClaros).toBe(false);
     },
   );
+});
+
+/** Un PNG gris liso, en lugar de una foto real. */
+async function fotoFalsa(): Promise<Buffer> {
+  return sharp({
+    create: { width: 800, height: 1400, channels: 4, background: { r: 128, g: 128, b: 128, alpha: 1 } },
+  })
+    .png()
+    .toBuffer();
+}
+
+describe("foto", () => {
+  it("sin foto renderiza igual (la foto es opcional)", async () => {
+    const png = await renderizar(DATOS_DEMO, "1:1");
+    expect(await medidas(png)).toEqual({ ancho: 1080, alto: 1080 });
+  });
+
+  it("con foto pinta la mitad derecha", async () => {
+    const png = await renderizar(DATOS_DEMO, "1:1", await fotoFalsa());
+    const [r, g, b] = await pixelEn(png, 900, 700);
+    expect(r).toBeGreaterThan(100);
+    expect(r).toBe(g);
+    expect(g).toBe(b);
+  });
+
+  it("con foto no tapa el bloque de texto de la izquierda", async () => {
+    const png = await renderizar(DATOS_DEMO, "1:1", await fotoFalsa());
+    expect(await pixelEn(png, 30, 540)).toEqual([0, 0, 0]);
+  });
 });
