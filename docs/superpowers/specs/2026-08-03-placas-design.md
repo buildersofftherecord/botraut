@@ -34,21 +34,80 @@ generativa es el texto del rol y la selección de candidatas de foto.
 - Un solo lienzo: **1:1, 1080×1080** (el de la placa de referencia)
 - Trigger desde un canal de Slack
 - Búsqueda automática de copy (rol / afiliación) del invitado
-- Búsqueda automática de hasta 4 fotos candidatas
+- **La foto la sube el humano al thread de Slack** (ver §3.1)
+- Validación de la foto subida, con feedback explícito si no sirve
 - Recorte de fondo + conversión a blanco y negro
 - Modal para fecha y hora
-- Aprobación humana antes de renderizar
 - Almacenamiento en Vercel Blob (foto original, foto procesada, placa final)
 - Script de render local para iterar el diseño sin Slack
 
 **Afuera, explícitamente:**
 
+- **Búsqueda automática de fotos** — ver §3.1
 - Los otros tres lienzos (4:5, 9:16, 16:9) — el template queda parametrizado
   por lienzo para que agregarlos sea configuración, no rediseño
 - Publicación automática a Instagram / X / YouTube
 - Placas post-episodio con citas de la transcripción
 - Cualquier integración con Linear
 - Base de datos de invitados
+
+## 3.1 Cambio de alcance: la foto la sube el humano
+
+**Decidido 2026-08-04, reemplaza el diseño original de búsqueda automática.**
+
+El diseño original buscaba hasta 4 fotos candidatas en internet y te las
+mostraba para elegir. Se descartó por dos motivos que aparecieron al ver la
+placa de referencia:
+
+1. **El template exige mucho de la foto.** Medio cuerpo o más, fondo separable,
+   ≥800px, persona bien expuesta. La estimación de acierto de una búsqueda
+   automática era 20-30% — el riesgo más grande del proyecto.
+2. **Toda API de búsqueda de imágenes con cobertura razonable pide tarjeta.**
+   Google Custom Search está cerrada a clientes nuevos y se discontinúa el
+   2027-01-01; Brave y SerpAPI piden tarjeta aun en sus tiers gratuitos.
+
+La spec original ya anticipaba esta salida en §9: *"si después de 10 invitados
+la tasa de acierto es baja, la respuesta correcta es pedirle la foto al
+invitado"*. Se toma esa salida **antes** de gastar en medirlo.
+
+**Lo que gana el proyecto:** desaparece su riesgo principal, desaparece una
+cuenta paga, y la calidad de la foto sube — cuando confirmás un invitado ya
+estás hablando con esa persona, y una foto que eligió alguien es mejor que
+cualquier cosa que devuelva un buscador.
+
+**Lo que no cambia:** el recorte de fondo sigue siendo necesario. Una foto
+provista igual viene con fondo, y el template pide una silueta.
+
+### El comportamiento (opción C)
+
+El bot se adapta a si la foto ya viene o no:
+
+```
+Con foto adjunta                      Sin foto adjunta
+─────────────────                     ────────────────
+"Naomi Couriel" + [foto]              "Naomi Couriel"
+   ↓ busca copy                          ↓ busca copy
+   ↓ valida la foto                   "Es AI Engineering en UdeSA...
+   ↓ modal fecha/hora                  Mandame una foto: medio cuerpo,
+   ↓ placa                             fondo limpio, 800px o más."
+                                          ↓ [foto]
+                                          ↓ valida
+                                          ↓ modal fecha/hora
+                                          ↓ placa
+```
+
+Es un `if` sobre la presencia de adjuntos. Cubre tanto el caso de tener la foto
+a mano como el de todavía no haberla pedido.
+
+### La validación cambia de sentido
+
+En el diseño original el filtro descartaba candidatas en silencio. Ahora que la
+foto la elegís vos, la validación **te habla**:
+
+> *"Esa foto tiene 480px de ancho — va a salir pixelada en la placa. ¿Mandás
+> otra?"*
+
+Es mejor que renderizar algo feo y que te des cuenta cuando ya está publicado.
 
 ---
 
@@ -149,17 +208,24 @@ Tres turnos. Cada uno es una invocación independiente de una función que muere
 al terminar; el estado vive en Redis entre turnos.
 
 ```
-TURNO 1 ─ alguien escribe "Naomi Couriel" en el canal
+TURNO 1 ─ alguien escribe "Naomi Couriel" en el canal, con o sin foto adjunta
    │
    ├─ ack inmediato: "Buscando a Naomi Couriel..."
-   ├─ [A] copy: quién es, rol, afiliación
-   ├─ [B] fotos: hasta 4 candidatas
-   ├─ guarda todo en Redis + Blob
-   └─ postea card: copy propuesto + las 4 fotos + botones
-        │
-TURNO 2 ─ click en una foto
+   ├─ copy: quién es, rol, género  (una llamada al LLM)
+   ├─ guarda el copy en Redis
    │
-   ├─ abre modal: fecha, hora, ¿en vivo?, INVITADA/INVITADO
+   ├─ ¿venía foto adjunta?
+   │     SÍ  → valida → si pasa, abre el modal (salta al turno 2)
+   │     NO  → postea el copy + "mandame una foto: medio cuerpo,
+   │           fondo limpio, 800px o más" + botón [Editar copy]
+   │
+TURNO 2 ─ subís una foto al thread  (o ya venía del turno 1)
+   │
+   ├─ valida medidas
+   │     no pasa → te dice por qué y espera otra
+   │     pasa    → guarda el original en Blob
+   │
+   └─ abre modal: fecha, hora, ¿en vivo?, INVITADA/INVITADO
    │
 TURNO 3 ─ submit del modal
    │
@@ -171,17 +237,12 @@ TURNO 3 ─ submit del modal
 
 ### Salidas de emergencia
 
-El flujo tiene que tener final incluso cuando la búsqueda falla:
-
 | Situación | Salida |
 |---|---|
-| Ninguna de las 4 fotos sirve | botón **"Subo yo la foto"** → subís una imagen al thread → sigue en el turno 2 |
-| El copy no te gusta | botón **"Editar"** → modal con título y descripción editables |
-| No encuentra a la persona | mensaje explícito + opción de cargar todo a mano |
+| La foto no pasa la validación | mensaje con el motivo concreto ("tiene 480px, va a salir pixelada") y espera otra |
+| El copy no te gusta | botón **"Editar"** → modal con nombre y rol editables |
+| No encuentra a la persona | mensaje explícito + opción de cargar el copy a mano |
 | Nombre ambiguo | devuelve las opciones que encontró y pregunta cuál |
-
-Sin la primera, el sistema no tiene final cuando la búsqueda de fotos falla —
-que según la estimación va a pasar seguido (ver §9).
 
 ---
 
@@ -196,8 +257,8 @@ const Invitado = z.object({
 })
 
 const Foto = z.object({
-  url:         z.string().url(),
-  fuente:      z.string().url(),     // la página, no el archivo — para derechos
+  url:         z.string().url(),     // la URL del archivo en Slack
+  fuente:      z.string().optional(), // quién la subió — ver nota abajo
   ancho:       z.number().min(800),
   alto:        z.number().min(800),
 })
@@ -215,6 +276,16 @@ const Placa = z.object({
 modelo se ajusta al límite; el template no hace malabares con CSS. `max(24)` en
 el nombre sale de que "GUILLERMO RAUCH" ocupa dos líneas al tamaño de la
 referencia.
+
+**`fuente` cambió de significado con §3.1.** Era la página web de donde salía la
+foto, obligatoria, para dejar rastro de derechos cuando la encontraba un
+buscador. Ahora que la sube un humano, el rastro es quién la subió, y pasa a ser
+opcional. `lib/tipos.ts` todavía la tiene como `z.string().url()` obligatoria —
+la Task 16 la ajusta.
+
+**Las medidas dejan de ser un filtro silencioso y pasan a ser un mensaje.** Con
+búsqueda automática, una foto de 480px se descartaba sin decir nada. Ahora el
+bot te dice por qué no sirve y espera otra.
 
 **`genero` existe porque el template dice `INVITADA` o `INVITADO`.** Es un campo
 real del diseño, no un detalle. Se infiere en la búsqueda y se puede corregir en
@@ -298,54 +369,57 @@ complejos. Consecuencias:
 
 ## 8. Pipeline de la foto
 
-Es la parte con más piezas móviles y la que concentra el riesgo.
-
 ```
-1. búsqueda de imágenes  →  URLs candidatas
-2. filtro                →  descarta <800px, descarta aspect ratios imposibles
-3. descarga              →  guarda original en Blob
+1. la subís al thread    →  Slack da una URL de archivo
+2. descarga              →  guarda original en Blob
+3. validación            →  medidas; si no pasa, te dice por qué y espera otra
 4. recorte de fondo      →  PNG con transparencia
 5. blanco y negro        →  sharp: .grayscale()
-6. resize + posición     →  al alto del lienzo
+6. resize                →  al alto del lienzo
 7. al template
 ```
 
-Los pasos 4 y 5 corren **solo sobre la foto que elegiste**, no sobre las 4. Eso
-mantiene el costo en una sola operación de recorte por placa.
+Los pasos 4 a 6 corren una sola vez por placa, sobre la foto que ya pasó la
+validación. El recorte es el paso caro y no se ejecuta sobre nada descartable.
 
 **Requisitos que tiene que cumplir una foto para servir en este template:**
 
-1. Medio cuerpo o cuerpo entero — un headshot apretado no llega al borde inferior
-2. Fondo separable — pelo suelto sobre fondo complejo da un recorte sucio
-3. Mínimo 800px de lado, idealmente 1200+
-4. La persona identificable y bien expuesta
+| | Requisito | ¿Verificable en código? |
+|---|---|---|
+| 1 | Medio cuerpo o cuerpo entero — un headshot apretado no llega al borde inferior | parcialmente: la proporción lo aproxima |
+| 2 | Fondo separable — pelo suelto sobre fondo complejo da un recorte sucio | no |
+| 3 | Mínimo 800px de lado, idealmente 1200+ | sí |
+| 4 | La persona identificable y bien expuesta | no |
 
-Esos cuatro criterios van explícitos en el prompt de búsqueda y en el filtro
-programático del paso 2.
+El paso 3 solo puede verificar el requisito 3 y aproximar el 1. **Los otros dos
+los verifica el ojo humano al elegir qué foto subir**, que es exactamente el
+motivo del cambio de §3.1: mover ese juicio a donde hay un humano mirando, en
+vez de pedirle a un buscador que lo adivine.
 
 ---
 
 ## 9. Riesgos conocidos
 
-### 🔴 Alto — La tasa de acierto de la búsqueda de fotos
+### ✅ Cerrado — La tasa de acierto de la búsqueda de fotos
 
-Estimación: **20-30% de las fotos encontradas van a cumplir los cuatro
-requisitos.** Ofrecer 4 candidatas mejora la chance de que al menos una sirva,
-pero no la garantiza.
+**Era el riesgo principal del proyecto. §3.1 lo elimina** sacando la búsqueda
+automática del alcance. La estimación era 20-30% de acierto y la mitigación
+prevista ya era "pedirle la foto al invitado"; se tomó esa salida antes de
+gastar en medirla.
 
-Este riesgo se aceptó explícitamente. La mitigación es la salida de emergencia
-de §5 ("Subo yo la foto"). **Si después de 10 invitados reales la tasa de
-acierto es baja, la respuesta correcta es pedirle la foto al invitado, no
-invertir más en la búsqueda.**
+### ✅ Cerrado — Búsqueda de imágenes ≠ web search
 
-### 🔴 Alto — Búsqueda de imágenes ≠ web search
+Ya no aplica. Ninguna API de búsqueda de imágenes entra al v1, así que tampoco
+hace falta el spike que las comparaba ni una cuenta con tarjeta.
 
-`web_search` de Anthropic devuelve páginas web, no imágenes. Para conseguir
-fotos hace falta una API de búsqueda de imágenes aparte: Google Custom Search,
-Brave, o SerpAPI. Son **dos llamadas distintas** con dos proveedores distintos.
+### 🟡 Medio — La calidad del recorte sobre una foto arbitraria
 
-**Spike requerido antes de escribir código:** elegir el proveedor de búsqueda de
-imágenes y verificar calidad de resultados con 5 nombres reales.
+Sigue vigente, aunque atenuado. Una foto elegida por un humano recorta mejor que
+una encontrada al azar, pero el pelo suelto sobre fondo complejo sigue dando
+bordes sucios.
+
+Mitigación: el mensaje que pide la foto dice explícitamente "fondo limpio", y el
+resultado se ve en Slack antes de publicar nada.
 
 ### 🟡 Medio — Server tools a través de AI Gateway
 
@@ -422,9 +496,12 @@ queda bien, nada de lo demás importa.
 El v1 está listo cuando, para 5 invitados reales:
 
 - El copy generado se usa sin editar en al menos 3 de 5
-- Al menos una de las 4 fotos sirve en al menos 3 de 5
+- El recorte de fondo sale limpio en al menos 4 de 5
 - La placa renderizada es indistinguible de una hecha a mano
 - El ciclo completo, de escribir el nombre a tener el PNG, toma menos de 2 minutos
 
-Si el segundo criterio falla, la conclusión no es mejorar la búsqueda: es pedir
-la foto al invitado.
+**El criterio de la foto cambió con §3.1.** Antes medía si la búsqueda
+encontraba algo usable; ahora mide si el recorte funciona sobre fotos que vos
+elegiste. Si falla, la salida no es cambiar de proveedor de recorte antes de
+revisar qué tenían en común las fotos que fallaron — probablemente sea el fondo,
+y eso se arregla en el mensaje que pide la foto, gratis.
