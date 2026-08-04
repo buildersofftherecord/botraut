@@ -14,8 +14,11 @@ describe("renderizar", () => {
 
   it("el fondo es negro", async () => {
     const png = await renderizar(DATOS_DEMO, "1:1");
-    // Un punto del centro-izquierda, lejos de texto y de la foto.
-    expect(await pixelEn(png, 30, 540)).toEqual([0, 0, 0]);
+    // Un punto del centro-izquierda, lejos de texto y de la foto. Puede caer
+    // sobre un dígito de la textura de binario (Task 11): el umbral sigue
+    // siendo estricto porque la textura es de bajo contraste por diseño.
+    const [r] = await pixelEn(png, 30, 540);
+    expect(r).toBeLessThan(40);
   });
 
   it("es determinista: dos renders dan bytes idénticos", async () => {
@@ -184,6 +187,9 @@ describe("foto", () => {
 
   it("con foto no tapa el bloque de texto de la izquierda", async () => {
     const png = await renderizar(DATOS_DEMO, "1:1", await fotoFalsa());
-    expect(await pixelEn(png, 30, 540)).toEqual([0, 0, 0]);
+    // Mismo umbral que "el fondo es negro": puede caer sobre un dígito de la
+    // textura de binario.
+    const [r] = await pixelEn(png, 30, 540);
+    expect(r).toBeLessThan(40);
   });
 });

@@ -43,6 +43,7 @@ export async function renderizar(
   const l = LIENZOS[nombreLienzo];
   const anchoColumna = l.ancho * (1 - l.fotoAncho) - l.margen - 40;
   const sticker = await readFile(join(aca, "svg", "botr-sticker.svg"));
+  const binario = await readFile(join(aca, "texturas", "binario.png"));
   const [fuentes, tamanoDelNombre] = await Promise.all([
     cargarFuentes(),
     tamanoNombre(datos.invitado.nombre, anchoColumna, l.nombreTamano),
@@ -60,6 +61,13 @@ export async function renderizar(
           fontFamily: FUENTE.mono,
         }}
       >
+        {/* Textura de binario: atmósfera de fondo, no información. Va
+            primera en el árbol para que todo lo demás pinte encima. */}
+        <img
+          src={`data:image/png;base64,${binario.toString("base64")}`}
+          style={{ position: "absolute", top: 0, left: 0, width: l.ancho, height: l.alto }}
+        />
+
         {/* La foto: a sangre derecha, cortada abajo. Llega ya recortada y en
             B/N desde lib/procesar.ts — Satori no soporta filter. Va primera
             en el árbol para que el marco HUD y la tipografía pinten encima. */}
