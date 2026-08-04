@@ -104,6 +104,24 @@ describe("tamanoNombre", () => {
   });
 });
 
+describe("caja de datos", () => {
+  it("dibuja el borde de la caja", async () => {
+    const png = await renderizar(DATOS_DEMO, "1:1");
+    // Borde izquierdo de la caja: (x=68, y=830) cae justo sobre la línea de
+    // 1px, medido en la imagen. COLOR.linea es rgba(255,255,255,0.1) sobre
+    // negro, así que el borde da r≈25, no el >180 de un blanco casi puro:
+    // el umbral del plan (30) asumía un color más claro que el del token.
+    const [r] = await pixelEn(png, 68, 830);
+    expect(r).toBeGreaterThan(20);
+  });
+
+  it("omite EN VIVO cuando enVivo es false", async () => {
+    const conVivo = await renderizar(DATOS_DEMO, "1:1");
+    const sinVivo = await renderizar({ ...DATOS_DEMO, enVivo: false }, "1:1");
+    expect(conVivo.equals(sinVivo)).toBe(false);
+  });
+});
+
 describe("el nombre nunca invade la columna reservada para la foto", () => {
   const l = LIENZOS["1:1"];
   // Frontera real del diseño: a la derecha de esto empieza el 48% que

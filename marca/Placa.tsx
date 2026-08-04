@@ -4,6 +4,7 @@ import { cargarFuentes } from "./fuentes/index";
 import { LIENZOS, type NombreLienzo } from "./lienzos";
 import { COLOR, FUENTE } from "./tokens";
 import { Esquinas, Etiqueta, PuntoRec } from "./Hud";
+import { IconoCalendario, IconoReloj, IconoSenal } from "./Iconos";
 import { etiquetaInvitado, type DatosPlaca } from "../lib/tipos";
 import { tamanoNombre, NOMBRE_LETTER_SPACING_EM } from "./medirNombre";
 
@@ -138,6 +139,37 @@ export async function renderizar(
           >
             {datos.invitado.rol}
           </div>
+        </div>
+
+        {/* Caja de datos, abajo a la izquierda */}
+        <div
+          style={{
+            position: "absolute",
+            left: l.margen + 28,
+            bottom: l.margen + 60,
+            display: "flex",
+            flexDirection: "column",
+            border: `1px solid ${COLOR.linea}`,
+            padding: "26px 34px",
+            gap: 22,
+          }}
+        >
+          {[
+            { icono: <IconoCalendario />, texto: datos.fecha, vivo: false },
+            { icono: <IconoReloj />, texto: datos.hora, vivo: false },
+            ...(datos.enVivo
+              ? [{ icono: <IconoSenal />, texto: "EN VIVO", vivo: true }]
+              : []),
+          ].map((fila, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 20 }}>
+              {fila.icono}
+              <div style={{ display: "flex", width: 1, height: 24, background: COLOR.linea }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {fila.vivo ? <PuntoRec tamano={8} /> : null}
+                <Etiqueta color={COLOR.t75}>{fila.texto}</Etiqueta>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     ),
