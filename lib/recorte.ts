@@ -1,4 +1,3 @@
-import { removeBackground } from "@imgly/background-removal-node";
 import sharp from "sharp";
 
 /**
@@ -12,6 +11,17 @@ import sharp from "sharp";
  */
 export async function recortar(entrada: Buffer): Promise<Buffer> {
   try {
+    // Import dinámico a propósito. En el tope del archivo, `@imgly` (155MB de
+    // paquete, 127MB de modelo, binarios nativos de onnxruntime) se carga
+    // cuando arranca la función de Slack, aunque el mensaje que llegó no tenga
+    // ninguna foto. Si esa carga falla, la función entera muere con un 500 de
+    // cuerpo vacío y el bot deja de contestar cualquier cosa — que es
+    // exactamente lo que pasó en producción el 2026-08-05.
+    //
+    // Acá adentro, el costo lo paga solo el camino que recorta, y un fallo de
+    // carga cae en el `catch` de abajo como cualquier otro error.
+    const { removeBackground } = await import("@imgly/background-removal-node");
+
     // La librería lee `blob.type` directamente, sin detectar el formato por
     // magic bytes — un Blob sin `type` tira "Unsupported format: " aunque
     // los bytes sean un JPEG válido. `descargar()` no conserva el
