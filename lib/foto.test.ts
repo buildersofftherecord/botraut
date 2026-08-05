@@ -17,9 +17,11 @@ vi.mock("./silueta", () => ({ recortarASilueta }));
 vi.mock("./mirar", () => ({ mirarSilueta }));
 
 const { validarFoto, PEDIDO_DE_FOTO } = await import("./foto");
-const { LIENZOS } = await import("../marca/lienzos");
+const { LIENZOS, altoDeFoto } = await import("../marca/lienzos");
 
-const ALTO_LIENZO = LIENZOS["4:5"].alto;
+// El alto al que el render efectivamente lleva la silueta, no el del lienzo:
+// son distintos, y el umbral se mide contra el primero.
+const ALTO_MINIMO = altoDeFoto(LIENZOS["4:5"]);
 
 async function imagen(ancho: number, alto: number): Promise<Buffer> {
   return sharp({
@@ -37,7 +39,7 @@ async function imagen(ancho: number, alto: number): Promise<Buffer> {
  */
 beforeEach(() => {
   recortar.mockResolvedValue(Buffer.from("recorte"));
-  recortarASilueta.mockResolvedValue({ png: Buffer.from("silueta"), ancho: 900, alto: ALTO_LIENZO });
+  recortarASilueta.mockResolvedValue({ png: Buffer.from("silueta"), ancho: 900, alto: ALTO_MINIMO });
   mirarSilueta.mockResolvedValue({ sirve: true });
 });
 
@@ -108,7 +110,7 @@ describe("validarFoto — recorte de fondo (recortar)", () => {
 });
 
 describe("validarFoto — geometría de la silueta", () => {
-  it("rechaza una silueta más baja que el lienzo, con los números concretos", async () => {
+  it("rechaza una silueta más baja que el mínimo, con los números concretos", async () => {
     recortarASilueta.mockResolvedValue({ png: Buffer.from("s"), ancho: 300, alto: 300 });
 
     const r = await validarFoto(await imagen(1200, 1200));
@@ -116,19 +118,19 @@ describe("validarFoto — geometría de la silueta", () => {
     expect(r.ok).toBe(false);
     if (!r.ok) {
       expect(r.motivo).toContain("300");
-      expect(r.motivo).toContain(String(ALTO_LIENZO));
+      expect(r.motivo).toContain(String(ALTO_MINIMO));
     }
     expect(mirarSilueta).not.toHaveBeenCalled();
   });
 
-  it("acepta una silueta exactamente al alto del lienzo", async () => {
-    recortarASilueta.mockResolvedValue({ png: Buffer.from("s"), ancho: 900, alto: ALTO_LIENZO });
+  it("acepta una silueta exactamente en el alto minimo", async () => {
+    recortarASilueta.mockResolvedValue({ png: Buffer.from("s"), ancho: 900, alto: ALTO_MINIMO });
     const r = await validarFoto(await imagen(1400, 1600));
     expect(r.ok).toBe(true);
   });
 
   it("rechaza apenas por debajo del alto mínimo de la silueta", async () => {
-    recortarASilueta.mockResolvedValue({ png: Buffer.from("s"), ancho: 900, alto: ALTO_LIENZO - 1 });
+    recortarASilueta.mockResolvedValue({ png: Buffer.from("s"), ancho: 900, alto: ALTO_MINIMO - 1 });
     const r = await validarFoto(await imagen(1400, 1600));
     expect(r.ok).toBe(false);
   });
@@ -148,7 +150,7 @@ describe("validarFoto — geometría de la silueta", () => {
 describe("validarFoto — el modelo de visión (mirarSilueta)", () => {
   it("le manda la silueta recortada, no la foto original", async () => {
     const pngSilueta = Buffer.from("silueta-especifica");
-    recortarASilueta.mockResolvedValue({ png: pngSilueta, ancho: 900, alto: ALTO_LIENZO });
+    recortarASilueta.mockResolvedValue({ png: pngSilueta, ancho: 900, alto: ALTO_MINIMO });
 
     await validarFoto(await imagen(1200, 1200));
 

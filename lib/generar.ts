@@ -2,7 +2,7 @@ import { descargar, aBlancoYNegro, ajustarAlto } from "./procesar";
 import { recortar } from "./recorte";
 import { recortarASilueta } from "./silueta";
 import { renderizar } from "../marca/Placa";
-import { LIENZOS } from "../marca/lienzos";
+import { LIENZOS, altoDeFoto } from "../marca/lienzos";
 import type { DatosPlaca } from "./tipos";
 
 /**
@@ -26,7 +26,7 @@ export async function generarPlaca(datos: DatosPlaca): Promise<{ png: Buffer }> 
   const recortada = await recortar(original);
   const silueta = await recortarASilueta(recortada);
   const gris = await aBlancoYNegro(silueta.png);
-  const foto = await ajustarAlto(gris, Math.round(LIENZOS["4:5"].alto * 0.94));
+  const foto = await ajustarAlto(gris, altoDeFoto(LIENZOS["4:5"]));
 
   const png = await renderizar(datos, "4:5", foto);
 

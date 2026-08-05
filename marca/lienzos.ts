@@ -29,3 +29,21 @@ export const LIENZOS = {
 } as const satisfies Record<string, Lienzo>;
 
 export type NombreLienzo = keyof typeof LIENZOS;
+
+/**
+ * La silueta no llega al alto completo del lienzo: queda por debajo del borde
+ * superior para que el marco HUD respire.
+ */
+const PROPORCION_ALTO_FOTO = 0.94;
+
+/**
+ * A qué alto real se lleva la silueta en un lienzo dado.
+ *
+ * Vive acá y no en `generar.ts` porque `lib/foto.ts` necesita el mismo número
+ * para decidir si una silueta tiene resolución suficiente. Cuando estaban
+ * separados, la validación exigía el alto crudo del lienzo y rechazaba fotos
+ * que el render iba a achicar igual.
+ */
+export function altoDeFoto(lienzo: Lienzo): number {
+  return Math.round(lienzo.alto * PROPORCION_ALTO_FOTO);
+}

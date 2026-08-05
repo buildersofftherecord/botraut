@@ -2,7 +2,7 @@ import sharp from "sharp";
 import { recortar } from "./recorte";
 import { recortarASilueta, type Silueta } from "./silueta";
 import { mirarSilueta, type Veredicto } from "./mirar";
-import { LIENZOS } from "../marca/lienzos";
+import { LIENZOS, altoDeFoto } from "../marca/lienzos";
 import type { Foto } from "./tipos";
 
 /**
@@ -14,14 +14,15 @@ import type { Foto } from "./tipos";
 const LADO_MINIMO = 800;
 
 /**
- * El template lleva la foto a este alto (`generar.ts`, vía
- * `LIENZOS["4:5"].alto`). Task 22b: ya no se mide la proporción del
- * archivo — una foto apaisada puede tener adentro una persona perfectamente
- * vertical. Lo que importa es cuánta resolución real tiene el sujeto una vez
- * separado del fondo, y eso se mide contra el alto al que el template lo va
- * a llevar.
+ * Task 22b: ya no se mide la proporción del archivo — una foto apaisada puede
+ * tener adentro una persona perfectamente vertical. Lo que importa es cuánta
+ * resolución real tiene el sujeto una vez separado del fondo.
+ *
+ * Se compara contra el alto al que el render efectivamente lleva la silueta,
+ * no contra el alto del lienzo: son distintos, y usar el crudo rechazaba
+ * siluetas que el propio render iba a achicar igual.
  */
-const ALTO_MINIMO_SILUETA = LIENZOS["4:5"].alto;
+const ALTO_MINIMO_SILUETA = altoDeFoto(LIENZOS["4:5"]);
 
 export type ResultadoValidacion =
   | { ok: true; foto: Pick<Foto, "ancho" | "alto"> }
