@@ -40,8 +40,14 @@ export async function recortar(entrada: Buffer): Promise<Buffer> {
     // espera la placa ve este mensaje textual, no el error de onnxruntime —
     // el mismo estándar que `foto.ts` aplica a sus `motivo`. La causa cruda
     // queda en `cause` para quien mire logs, nunca concatenada al texto.
+    // No afirma que el problema sea la foto. La primera versión decía "probá
+    // con el fondo más despejado" y se lo dijo a una foto de fondo gris liso,
+    // mientras la causa real era que el modelo no estaba desplegado. Un
+    // mensaje que culpa al humano por una falla nuestra lo manda a buscar
+    // fotos cada vez mejores para un problema que ninguna foto arregla.
     throw new Error(
-      "No pude recortar el fondo de esa foto. Probá con otra, preferentemente con el fondo más despejado.",
+      "No pude recortar el fondo de esa foto. Puede ser la imagen o un problema mío " +
+        "procesándola — si con otra tampoco sale, avisá que lo miro.",
       { cause: e },
     );
   }
