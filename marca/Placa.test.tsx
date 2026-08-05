@@ -34,6 +34,34 @@ describe("renderizar", () => {
   });
 });
 
+describe("textura de fondo", () => {
+  // Franja sin HUD, tipografía, foto ni caja de datos en ninguno de los dos
+  // lienzos (verificado a mano: el canal rojo máximo ahí es 11-12, muy por
+  // debajo del umbral 40 que separa textura de contenido). Si `renderizar`
+  // volviera a cargar una textura fija para todos los lienzos y Satori la
+  // estirara al alto pedido, la cantidad de dígitos por unidad de área en
+  // esta franja cambiaría entre 1:1 y 4:5 — que es exactamente el bug que
+  // esta task cierra.
+  const franja = { left: 600, top: 500, width: 80, height: 300 };
+
+  async function densidadDeTextura(png: Buffer): Promise<number> {
+    const { data } = await sharp(png)
+      .extract(franja)
+      .greyscale()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    let claros = 0;
+    for (const v of data) if (v > 0) claros++;
+    return (claros / (franja.width * franja.height)) * 100_000;
+  }
+
+  it("la textura tiene la misma densidad por área en 1:1 y en 4:5", async () => {
+    const densidad11 = await densidadDeTextura(await renderizar(DATOS_DEMO, "1:1"));
+    const densidad45 = await densidadDeTextura(await renderizar(DATOS_DEMO, "4:5"));
+    expect(Math.abs(densidad11 - densidad45) / densidad11).toBeLessThan(0.15);
+  });
+});
+
 describe("marco HUD", () => {
   it("dibuja el corchete superior izquierdo", async () => {
     const png = await renderizar(DATOS_DEMO, "1:1");
