@@ -25,8 +25,12 @@ export const InvitadoSchema = z.object({
  */
 export const FotoSchema = z.object({
   url: z.string().url(),
-  /** La página de donde salió, no el archivo. Es el rastro para derechos. */
-  fuente: z.string().url(),
+  /**
+   * Quién la subió. Era la página de origen cuando la foto la encontraba un
+   * buscador; con la foto provista por un humano el rastro de derechos es la
+   * persona, no una URL. Ver spec §3.1.
+   */
+  fuente: z.string().optional(),
   ancho: z.number().int().min(800),
   alto: z.number().int().min(800),
 });
