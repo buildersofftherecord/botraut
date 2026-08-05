@@ -62,14 +62,24 @@ TCP  → WRONGPASS      ← este es el que usa el adapter
 No es error de copiado: el valor vino del almacén de Vercel y lo rechazan los dos
 protocolos.
 
-- [ ] Borrar el store de Upstash en Vercel y crearlo de nuevo
-- [ ] Al conectarlo, **prefijo de variables vacío** — `@chat-adapter/state-redis`
-      lee únicamente `process.env.REDIS_URL` (verificado en `node_modules`)
-- [ ] Conectar los tres entornos, sobre todo **Development**, si no la URL no baja para local
-- [ ] Verificar con un ping antes de seguir. Si el hostname sigue siendo
-      `prompt-earwig-149142`, no se recreó nada
-- [ ] Si vuelve a fallar: crearlo directo en `console.upstash.com` con el mail de
-      BOTR y saltear el Marketplace, que ya falló dos veces
+**Se recreó el store el 2026-08-05 y falló igual.** Base nueva
+(`subtle-salmon-74535`), mismo `WRONGPASS`. Descartado el parseo de la URL y el
+encoding: conectando con `username`/`password` explícitos, sin pasar por la URL,
+falla idéntico. La contraseña son 62 caracteres limpios, sin `%`, `:` ni `@`.
+
+Dos bases independientes creadas por el mismo camino rechazan las dos su propia
+credencial. **El problema es el camino, no el recurso** — la integración
+Vercel↔Upstash provisiona en estado suspendido, o muestra credenciales que no
+corresponden a la base que creó.
+
+- [ ] Crear cuenta en **console.upstash.com** con el mail de BOTR. Es la cuenta
+      propia de Upstash, distinta de la que gestiona Vercel — por eso antes no
+      aparecía nada ahí
+- [ ] Create Database → Redis, región cercana a la de Vercel, tier gratis
+- [ ] Copiar el `rediss://...` de la página de la base, en Upstash directo
+- [ ] Pegarlo en `.env.local` **con comillas** y verificar con un ping
+- [ ] Para el deploy: cargar `REDIS_URL` **a mano** en Settings → Environment
+      Variables de Vercel. No volver a usar el Marketplace para esto
 
 ---
 
