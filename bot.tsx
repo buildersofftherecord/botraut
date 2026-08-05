@@ -1,22 +1,45 @@
-import { Chat, Card, CardText, Actions, Button, type Thread, type Attachment } from "chat";
+import { after } from "next/server";
+import {
+  Chat,
+  Card,
+  CardText,
+  Actions,
+  Button,
+  Modal,
+  TextInput,
+  RadioSelect,
+  SelectOption,
+  type Thread,
+  type Attachment,
+} from "chat";
 import { createSlackAdapter } from "@chat-adapter/slack";
 import { createRedisState } from "@chat-adapter/state-redis";
 import { buscarCopy, rehacerCopy } from "./lib/buscar";
 import { validarFoto } from "./lib/foto";
-import { InvitadoSchema, FotoSchema, type Copy } from "./lib/tipos";
+import { generarPlaca } from "./lib/generar";
+import { InvitadoSchema, FotoSchema, PlacaSchema, type Copy } from "./lib/tipos";
 import { EstadoThreadSchema, type EstadoThread } from "./lib/estado";
 import {
   mensajeNombreLargo,
   mensajeCopy,
   mensajeErrorBusqueda,
+  mensajeNoEncontrado,
   extraerFotoAdjunta,
   listoParaFecha,
   ID_BOTON_FECHA,
   TEXTO_BOTON_FECHA,
+  CALLBACK_ID_MODAL_FECHA,
+  TITULO_MODAL_FECHA,
   FOTO_SIN_URL,
   FOTO_SIN_DESCARGAR,
   SIN_ESTADO,
   mensajeFotoSinCopy,
+  mensajeSinFotoParaPlaca,
+  mensajeGenerando,
+  mensajePlacaLista,
+  mensajeErrorPlaca,
+  nombreArchivoPlaca,
+  erroresModalFecha,
   NO_ENTENDI,
 } from "./lib/mensajes";
 
@@ -232,3 +255,112 @@ async function postarBotonFecha(thread: Thread, nombre: string): Promise<void> {
     </Card>,
   );
 }
+
+/**
+ * Turno 3, paso 1: el clic en "Cargar fecha y hora" abre el modal. El
+ * `trigger_id` de Slack vence en ~3 segundos, así que `openModal` tiene que
+ * ser el primer `await` de este handler — nada de leer estado, validar, ni
+ * postear antes: si se demora, el modal no abre y el humano ve un error de
+ * Slack sin explicación.
+ *
+ * El género no va acá: ya está en `copy.genero` desde el turno 1
+ * (`etiquetaInvitado()` lo traduce a INVITADO/INVITADA/INVITADE) — si el
+ * humano lo quiere corregir, lo hace por texto como cualquier otra parte
+ * del copy, no por este modal.
+ */
+bot.onAction(ID_BOTON_FECHA, async (event) => {
+  await event.openModal(
+    <Modal callbackId={CALLBACK_ID_MODAL_FECHA} title={TITULO_MODAL_FECHA} submitLabel="Generar">
+      <TextInput id="fecha" label="Fecha" placeholder="JUEVES 30 DE JULIO" />
+      <TextInput id="hora" label="Hora" placeholder="21:00 HS" />
+      <RadioSelect id="enVivo" label="¿En vivo?">
+        <SelectOption label="Sí" value="si" />
+        <SelectOption label="No" value="no" />
+      </RadioSelect>
+    </Modal>,
+  );
+});
+
+/**
+ * Turno 3, paso 2: submit del modal. Arma los datos, dispara el render en
+ * segundo plano y cierra el modal.
+ *
+ * El adapter de Slack espera a que este handler resuelva antes de
+ * contestarle a Slack el `view_submission` — a diferencia de los eventos de
+ * mensaje, que Slack ya ackea solo y de ahí en más el trabajo corre en
+ * segundo plano (ver el comentario de `onNewMessage`). `view_submission`
+ * tiene su propia ventana de ~3 segundos, muy por debajo de los ~15s que
+ * tarda `generarPlaca` (bajar, recortar fondo con un modelo de 155MB,
+ * silueta, B/N, resize, Satori a 2x y bajar). Por eso el pipeline pesado no
+ * se espera acá: corre dentro de `after()` (el mismo `after` que ya usa
+ * `app/api/slack/route.ts`), que sigue vivo después de que la respuesta ya
+ * salió — el handler cierra el modal rápido, y la placa llega al thread por
+ * su lado unos segundos después.
+ */
+bot.onModalSubmit(CALLBACK_ID_MODAL_FECHA, async (event) => {
+  const thread = event.relatedThread;
+  if (!thread) return;
+
+  const estado = await leerEstado(thread);
+  if (!estado) {
+    await thread.post(SIN_ESTADO);
+    return;
+  }
+  if (!estado.foto) {
+    // No debería pasar: el botón que abre este modal solo aparece después de
+    // que la foto ya validó (ver `postarBotonFecha`). Pero un TTL vencido a
+    // mitad de camino, o un botón viejo en un thread reabierto, sí lo permiten.
+    await thread.post(mensajeSinFotoParaPlaca(estado.nombre));
+    return;
+  }
+  if (!listoParaFecha(estado.copy)) {
+    await thread.post(mensajeNoEncontrado(estado.nombre));
+    return;
+  }
+
+  const candidato = PlacaSchema.safeParse({
+    invitado: { nombre: estado.nombre, ...estado.copy },
+    fotoElegida: estado.foto,
+    // Sin mayúscula acá a propósito: `Etiqueta` en `marca/Hud.tsx` ya aplica
+    // `textTransform: uppercase` a fecha y hora. Pasarlas en mayúscula
+    // también acá duplicaría la misma regla en dos lugares.
+    fecha: event.values.fecha?.trim() ?? "",
+    hora: event.values.hora?.trim() ?? "",
+    enVivo: event.values.enVivo === "si",
+  });
+
+  if (!candidato.success) {
+    const errores = erroresModalFecha(candidato.error);
+    if (Object.keys(errores).length > 0) {
+      return { action: "errors", errors: errores };
+    }
+    // `invitado`/`fotoElegida` salen del estado, no del modal — si fallan
+    // acá no hay ningún campo del formulario al que apuntar.
+    await thread.post(SIN_ESTADO);
+    return;
+  }
+
+  const datos = candidato.data;
+
+  // El render tarda ~15s: avisar antes de arrancar, mismo criterio que
+  // "Buscando a X..." (turno 1) y "Mirando la foto..." (turno 2) — el
+  // silencio es el peor modo de falla de este bot.
+  await thread.post(mensajeGenerando(estado.nombre));
+
+  after(async () => {
+    try {
+      const { png } = await generarPlaca(datos);
+      await thread.post({
+        markdown: mensajePlacaLista(estado.nombre),
+        files: [{ data: png, filename: nombreArchivoPlaca(estado.nombre), mimeType: "image/png" }],
+      });
+    } catch (e) {
+      // `descargar()` no traduce sus errores (ver mensajeErrorPlaca) — la
+      // causa cruda se corta acá, antes de Slack.
+      console.error(`generarPlaca falló para "${estado.nombre}"`, e);
+      await thread.post(mensajeErrorPlaca(estado.nombre, e));
+    }
+  });
+
+  return { action: "close" };
+});
