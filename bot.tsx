@@ -39,6 +39,7 @@ import {
   mensajePlacaLista,
   mensajeErrorPlaca,
   nombreArchivoPlaca,
+  SUBIDA_FALLIDA,
   erroresModalFecha,
   NO_ENTENDI,
 } from "./lib/mensajes";
@@ -133,6 +134,22 @@ bot.onSubscribedMessage(async (thread, message) => {
 
   await procesarCorreccion(thread, estado, correccion);
 });
+
+/**
+ * Postea sin dejar que un fallo de red se lleve puesto al que llama.
+ *
+ * Adentro de `after()` no hay nadie escuchando: una excepción acá termina en
+ * un rechazo que nadie atrapa, y el humano se queda esperando una placa que
+ * nunca llega después de que el bot le dijo "generando". Si el aviso no sale,
+ * al menos queda en los logs.
+ */
+async function avisar(thread: Thread, texto: string): Promise<void> {
+  try {
+    await thread.post(texto);
+  } catch (e) {
+    console.error(`no se pudo avisar en ${thread.id}: "${texto}"`, e);
+  }
+}
 
 /**
  * Lee y valida el estado del thread. Nunca confía en lo que vuelve del
@@ -342,23 +359,37 @@ bot.onModalSubmit(CALLBACK_ID_MODAL_FECHA, async (event) => {
 
   const datos = candidato.data;
 
-  // El render tarda ~15s: avisar antes de arrancar, mismo criterio que
-  // "Buscando a X..." (turno 1) y "Mirando la foto..." (turno 2) — el
-  // silencio es el peor modo de falla de este bot.
-  await thread.post(mensajeGenerando(estado.nombre));
-
+  // Todo lo pesado va adentro de `after()`, incluido el aviso: a diferencia de
+  // los eventos de mensaje, `view_submission` espera a que este handler
+  // resuelva antes de ackear a Slack, y ahí hay ~3 segundos. Hasta un `post`
+  // es una llamada de red que compite con esa ventana.
   after(async () => {
+    // El render tarda ~9s: avisar antes de arrancar, mismo criterio que
+    // "Buscando a X..." (turno 1) y "Mirando la foto..." (turno 2) — el
+    // silencio es el peor modo de falla de este bot.
+    await avisar(thread, mensajeGenerando(estado.nombre));
+
+    let png: Buffer;
     try {
-      const { png } = await generarPlaca(datos);
+      ({ png } = await generarPlaca(datos));
+    } catch (e) {
+      // `descargar()` no traduce sus errores (ver mensajeErrorPlaca) — la
+      // causa cruda se corta acá, antes de Slack.
+      console.error(`generarPlaca falló para "${estado.nombre}"`, e);
+      await avisar(thread, mensajeErrorPlaca(estado.nombre, e));
+      return;
+    }
+
+    // Separado del render: si falla la subida, la placa se generó bien y el
+    // mensaje tiene que decir eso, no un error de render.
+    try {
       await thread.post({
         markdown: mensajePlacaLista(estado.nombre),
         files: [{ data: png, filename: nombreArchivoPlaca(estado.nombre), mimeType: "image/png" }],
       });
     } catch (e) {
-      // `descargar()` no traduce sus errores (ver mensajeErrorPlaca) — la
-      // causa cruda se corta acá, antes de Slack.
-      console.error(`generarPlaca falló para "${estado.nombre}"`, e);
-      await thread.post(mensajeErrorPlaca(estado.nombre, e));
+      console.error(`falló la subida de la placa de "${estado.nombre}"`, e);
+      await avisar(thread, SUBIDA_FALLIDA);
     }
   });
 

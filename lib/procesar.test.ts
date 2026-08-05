@@ -134,6 +134,23 @@ describe("descargar", () => {
     );
   });
 
+  // El `content-type` lo declara el servidor y puede mentir; los bytes no.
+  // Sin mirar el cuerpo, un HTML servido como `image/png` pasaría el chequeo
+  // anterior y llegaría a `sharp` disfrazado de foto.
+  it("rechaza HTML aunque el content-type diga que es una imagen", async () => {
+    const html = new TextEncoder().encode("<!DOCTYPE html><html>Sign in to Slack</html>").buffer;
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "image/png" }),
+      arrayBuffer: async () => html,
+    } as Response);
+
+    await expect(descargar("https://files.slack.com/foto-privada.jpg")).rejects.toThrow(
+      /HTML|autenticaci/i,
+    );
+  });
+
   it("con el header, baja los bytes de una URL privada de Slack", async () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,

@@ -234,3 +234,11 @@ export function erroresModalFecha(error: z.ZodError): Record<string, string> {
   }
   return errores;
 }
+
+/**
+ * La placa se generó bien pero no se pudo subir al thread. Se distingue del
+ * error de render a propósito: el trabajo caro ya está hecho y reintentar es
+ * barato.
+ */
+export const SUBIDA_FALLIDA =
+  "Armé la placa pero no pude subirla al thread. Apretá de nuevo *Cargar fecha y hora* y la vuelvo a mandar.";

@@ -33,7 +33,25 @@ export async function descargar(url: string, headers?: HeadersInit): Promise<Buf
   const bytes = Buffer.from(await r.arrayBuffer());
   if (bytes.length > MAXIMO_BYTES) throw new Error(`descarga: ${bytes.length} bytes es demasiado`);
 
+  // El `content-type` lo declara el servidor y puede mentir; los bytes no. Se
+  // mira el arranque real del cuerpo porque el caso que importa —la página de
+  // login de Slack— es HTML, y así el chequeo no depende de un header.
+  if (pareceHtml(bytes)) {
+    throw new Error(
+      `descarga: ${url} devolvió HTML en vez de una imagen — ` +
+        `probablemente falta o venció la autenticación`,
+    );
+  }
+
   return bytes;
+}
+
+/**
+ * Los formatos de imagen que aceptamos son binarios y ninguno arranca con
+ * `<`. Alcanza con mirar el primer carácter no blanco.
+ */
+function pareceHtml(bytes: Buffer): boolean {
+  return bytes.subarray(0, 64).toString("latin1").trimStart().startsWith("<");
 }
 
 /**
