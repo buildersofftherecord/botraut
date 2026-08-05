@@ -1,5 +1,4 @@
 import { Chat } from "chat";
-import type { z } from "zod";
 import { createSlackAdapter } from "@chat-adapter/slack";
 import { createMemoryState } from "@chat-adapter/state-memory";
 // TODO(deploy): en serverless cada mensaje cae en una función que arranca sin
@@ -7,29 +6,15 @@ import { createMemoryState } from "@chat-adapter/state-memory";
 // (ya instalado, REDIS_URL ya configurada). `state-memory` alcanza en local
 // porque `next dev` es un proceso vivo.
 import { buscarCopy } from "./lib/buscar";
-import { InvitadoSchema, etiquetaInvitado } from "./lib/tipos";
-import { PEDIDO_DE_FOTO } from "./lib/foto";
+import { InvitadoSchema } from "./lib/tipos";
 import { EstadoThreadSchema, type EstadoThread } from "./lib/estado";
+import { mensajeNombreLargo, mensajeCopy } from "./lib/mensajes";
 
 export const bot = new Chat({
   userName: "botraut",
   adapters: { slack: createSlackAdapter() },
   state: createMemoryState(),
 });
-
-/**
- * Arma el mensaje de largo excedido leyendo el máximo real del error de Zod
- * (`issue.maximum`), en vez de repetir "24" a mano acá — si el límite del
- * template cambia algún día, este mensaje se ajusta solo.
- */
-function mensajeNombreLargo(nombre: string, error: z.ZodError): string {
-  const issue = error.issues[0];
-  const maximo = issue?.code === "too_big" ? issue.maximum : "el máximo permitido";
-  return (
-    `Ese nombre tiene ${nombre.length} caracteres y la placa admite hasta ${maximo} — ` +
-    `si no entra, sale cortado o achicado. Pasame una versión más corta (apodo, sin apellido) y la busco.`
-  );
-}
 
 /**
  * Turno 1: alguien tira un nombre en el canal, sin mención de por medio.
@@ -41,8 +26,10 @@ function mensajeNombreLargo(nombre: string, error: z.ZodError): string {
 bot.onNewMessage(/\S/, async (thread, message) => {
   const nombre = message.text.trim();
 
-  // Ack antes de lo largo: Slack corta a los 3s y buscarCopy tarda ~5s. Si el
-  // humano no ve nada hasta que Gemini responde, parece que el bot no lo vio.
+  // Esto NO es lo que evita que Slack reintente: el adapter ya contesta 200 de
+  // forma síncrona sin esperar a este handler, y de los reintentos que igual
+  // lleguen se ocupa su deduplicado por `event_id`. Es feedback para el humano,
+  // porque buscarCopy tarda ~5s y el silencio parece que el bot no lo vio.
   await thread.post(`Buscando a *${nombre}*...`);
 
   const chequeoNombre = InvitadoSchema.shape.nombre.safeParse(nombre);
@@ -65,9 +52,7 @@ bot.onNewMessage(/\S/, async (thread, message) => {
     return;
   }
 
-  await thread.post(
-    `*${nombre}* — ${etiquetaInvitado(copy.genero)}\n${copy.rol}\n\n${PEDIDO_DE_FOTO}`,
-  );
+  await thread.post(mensajeCopy(nombre, copy));
 
   const estado = { nombre, copy } satisfies EstadoThread;
   await thread.setState(EstadoThreadSchema.parse(estado));

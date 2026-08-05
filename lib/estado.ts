@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CopySchema } from "./tipos";
+import { CopySchema, InvitadoSchema } from "./tipos";
 
 /**
  * Lo que vive entre el turno 1 y los siguientes. Se valida **al leer**, no
@@ -12,7 +12,9 @@ import { CopySchema } from "./tipos";
  * rehacer el schema.
  */
 export const EstadoThreadSchema = z.object({
-  nombre: z.string().min(1).max(24),
+  // Deriva de `InvitadoSchema` en vez de repetir el límite: son el mismo
+  // nombre, y dos declaraciones podrían divergir sin que nada avise.
+  nombre: InvitadoSchema.shape.nombre,
   copy: CopySchema,
 });
 
