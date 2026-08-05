@@ -42,7 +42,12 @@ import {
   SUBIDA_FALLIDA,
   erroresModalFecha,
   NO_ENTENDI,
+  CONFIRMAR_LISTO,
+  mensajeConfirmarSinFoto,
+  REINICIAR,
+  PEDIDO_FUERA_DE_ALCANCE,
 } from "./lib/mensajes";
+import { clasificar } from "./lib/intencion";
 
 export const bot = new Chat({
   userName: "botraut",
@@ -124,15 +129,46 @@ bot.onSubscribedMessage(async (thread, message) => {
     return;
   }
 
-  const correccion = message.text.trim();
-  if (!correccion) {
+  const texto = message.text.trim();
+  if (!texto) {
     // Un PDF, un sticker, un mensaje que queda vacío al recortarlo. No hay nada
     // que hacer con eso, pero decirlo es mejor que el silencio.
     await thread.post(NO_ENTENDI);
     return;
   }
 
-  await procesarCorreccion(thread, estado, correccion);
+  // Antes todo texto entraba como corrección del copy: "usa esa" republicaba el
+  // mismo rol y volvía a pedir la foto. El modelo clasifica qué quiso decir; qué
+  // se hace con cada categoría lo decide este switch, no el modelo.
+  switch (await clasificar(texto)) {
+    case "confirmar":
+      await thread.post(
+        estado.foto ? CONFIRMAR_LISTO : mensajeConfirmarSinFoto(estado.nombre),
+      );
+      if (estado.foto && listoParaFecha(estado.copy)) {
+        await postarBotonFecha(thread, estado.nombre);
+      }
+      return;
+
+    case "reiniciar":
+      // Se borra el estado, no se pisa: un `setState` parcial mergea y dejaría
+      // el nombre viejo colgado. Sin estado, el próximo mensaje arranca limpio.
+      await thread.setState({}, { replace: true });
+      await thread.post(REINICIAR);
+      return;
+
+    case "pedido":
+      await thread.post(PEDIDO_FUERA_DE_ALCANCE);
+      return;
+
+    case "otro":
+      await thread.post(NO_ENTENDI);
+      return;
+
+    case "corregir":
+      await procesarCorreccion(thread, estado, texto);
+      return;
+  }
 });
 
 /**

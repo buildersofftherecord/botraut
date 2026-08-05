@@ -242,3 +242,28 @@ export function erroresModalFecha(error: z.ZodError): Record<string, string> {
  */
 export const SUBIDA_FALLIDA =
   "Armé la placa pero no pude subirla al thread. Apretá de nuevo *Cargar fecha y hora* y la vuelvo a mandar.";
+
+/**
+ * El humano aprobó algo pero todavía falta la foto. Antes esto entraba como
+ * corrección del copy: "usa esa" volvía a publicar el mismo rol y a pedir la
+ * foto, sin reconocer que el humano había dicho algo.
+ */
+export function mensajeConfirmarSinFoto(nombre: string): string {
+  return `Dale. Me falta la foto de *${nombre}* para seguir.\n\n${PEDIDO_DE_FOTO}`;
+}
+
+/** Aprobó, y ya está todo: no hay nada que corregir, hay que seguir. */
+export const CONFIRMAR_LISTO = "Dale, entonces seguimos.";
+
+/** Quiere arrancar de nuevo o cambiar de invitado. */
+export const REINICIAR =
+  "Listo, arrancamos de cero. Tirame el nombre del invitado cuando quieras.";
+
+/**
+ * Le pidió al bot algo que no sabe hacer. Se le dice qué sí puede, en vez de
+ * un "no entendí" que lo deja adivinando cuál es el vocabulario válido.
+ */
+export const PEDIDO_FUERA_DE_ALCANCE =
+  "Eso todavía no lo sé hacer. Lo que sí: buscarte el copy de un invitado, " +
+  "recortar la foto que me mandes y armar la placa. Si querés cambiar algo del " +
+  "texto, escribime el dato y lo rehago.";
