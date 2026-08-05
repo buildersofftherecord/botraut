@@ -17,7 +17,12 @@ export async function recortar(entrada: Buffer): Promise<Buffer> {
     return Buffer.from(await salida.arrayBuffer());
   } catch (e) {
     // `recortar` corre dentro del handler de Slack: si tira, la persona que
-    // espera la placa ve este mensaje, no el stack de onnxruntime.
-    throw new Error(`recorte de fondo: ${(e as Error).message}`);
+    // espera la placa ve este mensaje textual, no el error de onnxruntime —
+    // el mismo estándar que `foto.ts` aplica a sus `motivo`. La causa cruda
+    // queda en `cause` para quien mire logs, nunca concatenada al texto.
+    throw new Error(
+      "No pude recortar el fondo de esa foto. Probá con otra, preferentemente con el fondo más despejado.",
+      { cause: e },
+    );
   }
 }
