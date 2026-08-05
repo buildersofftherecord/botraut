@@ -159,6 +159,12 @@ async function procesarFotoRecibida(
     return;
   }
 
+  // Task 22b: `validarFoto` ahora corre `recortar()` (carga un modelo de
+  // 155MB) y le muestra el resultado a Gemini — varios segundos, no la
+  // validación de metadata instantánea que era antes. Mismo criterio que
+  // "Buscando a X..." en el turno 1: el silencio se lee como que se colgó.
+  await thread.post(`Mirando la foto de *${estado.nombre}*...`);
+
   const resultado = await validarFoto(bytes);
   if (!resultado.ok) {
     // El motivo ya viene en castellano accionable — se publica tal cual.
