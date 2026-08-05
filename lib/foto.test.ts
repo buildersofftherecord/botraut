@@ -1,6 +1,25 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import sharp from "sharp";
-import { validarFoto } from "./foto";
+
+/**
+ * Se mockean los tres módulos hermanos (`./recorte`, `./silueta`, `./mirar`),
+ * no las librerías que ellos usan por dentro (@imgly, Gemini). Cada uno tiene
+ * su propia suite contra su propio contrato — acá se prueba la orquestación
+ * de `validarFoto`: qué corre, en qué orden, y qué mensaje sale de cada
+ * resultado. Mismo patrón que `generar.test.ts` con `./recorte`/`./procesar`.
+ */
+const recortar = vi.hoisted(() => vi.fn());
+const recortarASilueta = vi.hoisted(() => vi.fn());
+const mirarSilueta = vi.hoisted(() => vi.fn());
+
+vi.mock("./recorte", () => ({ recortar }));
+vi.mock("./silueta", () => ({ recortarASilueta }));
+vi.mock("./mirar", () => ({ mirarSilueta }));
+
+const { validarFoto, PEDIDO_DE_FOTO } = await import("./foto");
+const { LIENZOS } = await import("../marca/lienzos");
+
+const ALTO_LIENZO = LIENZOS["4:5"].alto;
 
 async function imagen(ancho: number, alto: number): Promise<Buffer> {
   return sharp({
@@ -10,57 +29,165 @@ async function imagen(ancho: number, alto: number): Promise<Buffer> {
     .toBuffer();
 }
 
-describe("validarFoto", () => {
-  it("acepta una foto vertical y grande", async () => {
-    const r = await validarFoto(await imagen(1200, 1600));
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.foto).toEqual({ ancho: 1200, alto: 1600 });
+/**
+ * Estado feliz por defecto — recorte y silueta grandes, el modelo aprueba.
+ * Cada test que necesite otra cosa lo pisa. `clearMocks: true`
+ * (vitest.config.ts) ya limpia las llamadas entre tests; esto solo fija el
+ * valor resuelto, que sí sobrevive un `mockClear`.
+ */
+beforeEach(() => {
+  recortar.mockResolvedValue(Buffer.from("recorte"));
+  recortarASilueta.mockResolvedValue({ png: Buffer.from("silueta"), ancho: 900, alto: ALTO_LIENZO });
+  mirarSilueta.mockResolvedValue({ sirve: true });
+});
+
+describe("validarFoto — chequeos baratos, antes de correr ningún modelo", () => {
+  it("rechaza lo que no es una imagen sin explotar", async () => {
+    const r = await validarFoto(Buffer.from("esto no es una imagen"));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo.length).toBeGreaterThan(0);
+    expect(recortar).not.toHaveBeenCalled();
   });
 
-  it("acepta exactamente en el mínimo", async () => {
-    // El borde de aceptación importa tanto como el de rechazo: un off-by-one
-    // que subiera el mínimo a 801 rechazaría fotos que sirven.
-    expect((await validarFoto(await imagen(800, 800))).ok).toBe(true);
+  it("el motivo nunca es un mensaje de error crudo de librería", async () => {
+    const r = await validarFoto(Buffer.from("xx"));
+    if (!r.ok) expect(r.motivo).not.toMatch(/Input buffer|unsupported image format|Error:/);
   });
 
-  it("rechaza una foto que se va a pixelar, y dice el ancho real", async () => {
+  it("rechaza un archivo por debajo del mínimo, con el ancho real, sin correr el modelo", async () => {
     const r = await validarFoto(await imagen(480, 640));
     expect(r.ok).toBe(false);
     if (!r.ok) {
       expect(r.motivo).toContain("480");
       expect(r.motivo.toLowerCase()).toContain("pixel");
     }
+    expect(recortar).not.toHaveBeenCalled();
   });
 
-  it("rechaza panorámicas explicando que no hay silueta", async () => {
-    const r = await validarFoto(await imagen(2400, 900));
+  it("acepta exactamente en el mínimo del archivo y sigue al recorte", async () => {
+    await validarFoto(await imagen(800, 800));
+    expect(recortar).toHaveBeenCalledTimes(1);
+  });
+
+  it("ya no rechaza apaisadas por proporción — el caso real que motivó la Task 22b", async () => {
+    // 1126×800: la foto que el bot rechazaba antes por "apaisada" aunque
+    // tuviera una persona vertical adentro. El chequeo barato ya no mide
+    // proporción, así que esto pasa al recorte igual que cualquier otra.
+    await validarFoto(await imagen(1126, 800));
+    expect(recortar).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("validarFoto — recorte de fondo (recortar)", () => {
+  it("si recortar() falla, su mensaje humano se publica tal cual", async () => {
+    const mensajeHumano =
+      "No pude recortar el fondo de esa foto. Probá con otra, preferentemente con el fondo más despejado.";
+    recortar.mockRejectedValue(new Error(mensajeHumano));
+
+    const r = await validarFoto(await imagen(1200, 1200));
+
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.motivo.toLowerCase()).toMatch(/apaisada|horizontal|medio cuerpo/);
+    if (!r.ok) expect(r.motivo).toBe(mensajeHumano);
+    expect(recortarASilueta).not.toHaveBeenCalled();
   });
 
-  it("acepta exactamente en el límite de proporción", async () => {
-    // Mismo argumento que el mínimo de tamaño: el borde de aceptación importa
-    // tanto como el de rechazo. La regla es "como mucho 1.1" (comparación con
-    // `>`), así que 880×800 = 1.1 exacto tiene que entrar.
-    expect((await validarFoto(await imagen(880, 800))).ok).toBe(true);
+  it("le pasa los bytes originales, no un preprocesado", async () => {
+    const bytes = await imagen(1200, 1200);
+    await validarFoto(bytes);
+    expect(recortar).toHaveBeenCalledWith(bytes);
   });
 
-  it("rechaza apenas por encima del límite de proporción", async () => {
-    expect((await validarFoto(await imagen(881, 800))).ok).toBe(false);
-  });
+  it("le pasa a recortarASilueta lo que devolvió recortar(), no los bytes originales", async () => {
+    const recorteBuf = Buffer.from("recorte-especifico");
+    recortar.mockResolvedValue(recorteBuf);
 
-  it("rechaza lo que no es una imagen sin explotar", async () => {
-    const r = await validarFoto(Buffer.from("esto no es una imagen"));
+    await validarFoto(await imagen(1200, 1200));
+
+    expect(recortarASilueta).toHaveBeenCalledWith(recorteBuf);
+  });
+});
+
+describe("validarFoto — geometría de la silueta", () => {
+  it("rechaza una silueta más baja que el lienzo, con los números concretos", async () => {
+    recortarASilueta.mockResolvedValue({ png: Buffer.from("s"), ancho: 300, alto: 300 });
+
+    const r = await validarFoto(await imagen(1200, 1200));
+
     expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.motivo.length).toBeGreaterThan(0);
-  });
-
-  it("el motivo nunca es un mensaje de error crudo de librería", async () => {
-    // Se le muestra a una persona en Slack. `Input buffer contains
-    // unsupported image format` no le sirve a nadie.
-    const r = await validarFoto(Buffer.from("xx"));
     if (!r.ok) {
-      expect(r.motivo).not.toMatch(/Input buffer|unsupported image format|Error:/);
+      expect(r.motivo).toContain("300");
+      expect(r.motivo).toContain(String(ALTO_LIENZO));
     }
+    expect(mirarSilueta).not.toHaveBeenCalled();
+  });
+
+  it("acepta una silueta exactamente al alto del lienzo", async () => {
+    recortarASilueta.mockResolvedValue({ png: Buffer.from("s"), ancho: 900, alto: ALTO_LIENZO });
+    const r = await validarFoto(await imagen(1400, 1600));
+    expect(r.ok).toBe(true);
+  });
+
+  it("rechaza apenas por debajo del alto mínimo de la silueta", async () => {
+    recortarASilueta.mockResolvedValue({ png: Buffer.from("s"), ancho: 900, alto: ALTO_LIENZO - 1 });
+    const r = await validarFoto(await imagen(1400, 1600));
+    expect(r.ok).toBe(false);
+  });
+
+  it("si recortarASilueta() falla (imagen totalmente transparente), su mensaje se publica tal cual", async () => {
+    const mensajeHumano = "No encontré a la persona en esa foto: el recorte de fondo quedó completamente transparente.";
+    recortarASilueta.mockRejectedValue(new Error(mensajeHumano));
+
+    const r = await validarFoto(await imagen(1200, 1200));
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo).toBe(mensajeHumano);
+    expect(mirarSilueta).not.toHaveBeenCalled();
+  });
+});
+
+describe("validarFoto — el modelo de visión (mirarSilueta)", () => {
+  it("le manda la silueta recortada, no la foto original", async () => {
+    const pngSilueta = Buffer.from("silueta-especifica");
+    recortarASilueta.mockResolvedValue({ png: pngSilueta, ancho: 900, alto: ALTO_LIENZO });
+
+    await validarFoto(await imagen(1200, 1200));
+
+    expect(mirarSilueta).toHaveBeenCalledWith(pngSilueta);
+  });
+
+  it("rechaza con el motivo exacto que devuelve el modelo", async () => {
+    mirarSilueta.mockResolvedValue({ sirve: false, motivo: "Se te ve solo la cara, mandame una de medio cuerpo" });
+
+    const r = await validarFoto(await imagen(1200, 1200));
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo).toBe("Se te ve solo la cara, mandame una de medio cuerpo");
+  });
+
+  it("acepta cuando el modelo aprueba, y devuelve las medidas del archivo original", async () => {
+    const r = await validarFoto(await imagen(1200, 1600));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.foto).toEqual({ ancho: 1200, alto: 1600 });
+  });
+
+  it("si el modelo falla (red, cuota), rechaza en vez de aceptar a ciegas", async () => {
+    mirarSilueta.mockRejectedValue(new Error("fetch failed"));
+
+    const r = await validarFoto(await imagen(1200, 1200));
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.motivo.toLowerCase()).toMatch(/probá de nuevo|gemini/);
+  });
+});
+
+describe("PEDIDO_DE_FOTO", () => {
+  it("ya no exige que sea más alta que ancha", () => {
+    expect(PEDIDO_DE_FOTO.toLowerCase()).not.toMatch(/más alta que ancha/);
+  });
+
+  it("pide medio cuerpo para arriba y fondo despejado", () => {
+    const p = PEDIDO_DE_FOTO.toLowerCase();
+    expect(p).toContain("medio cuerpo");
+    expect(p).toContain("fondo");
   });
 });
