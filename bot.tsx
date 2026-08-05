@@ -16,6 +16,8 @@ import {
   FOTO_SIN_URL,
   FOTO_SIN_DESCARGAR,
   SIN_ESTADO,
+  mensajeFotoSinCopy,
+  NO_ENTENDI,
 } from "./lib/mensajes";
 
 export const bot = new Chat({
@@ -99,7 +101,12 @@ bot.onSubscribedMessage(async (thread, message) => {
   }
 
   const correccion = message.text.trim();
-  if (!correccion) return; // ni foto ni texto: nada accionable
+  if (!correccion) {
+    // Un PDF, un sticker, un mensaje que queda vacío al recortarlo. No hay nada
+    // que hacer con eso, pero decirlo es mejor que el silencio.
+    await thread.post(NO_ENTENDI);
+    return;
+  }
 
   await procesarCorreccion(thread, estado, correccion);
 });
@@ -170,10 +177,12 @@ async function procesarFotoRecibida(
 
   if (listoParaFecha(estado.copy)) {
     await postarBotonFecha(thread, estado.nombre);
+    return;
   }
-  // Si el copy sigue en NO_ENCONTRADO, la foto queda guardada pero el botón
-  // no se ofrece todavía: falta resolver el rol, que es lo que ya se le pidió
-  // al humano en `mensajeNoEncontrado`.
+
+  // Con el copy todavía en NO_ENCONTRADO no se ofrece el botón, pero igual hay
+  // que contestar: quedarse callado acá es indistinguible de estar roto.
+  await thread.post(mensajeFotoSinCopy(estado.nombre));
 }
 
 /**

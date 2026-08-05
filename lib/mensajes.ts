@@ -99,7 +99,7 @@ export function listoParaFecha(copy: Copy): boolean {
   return copy.rol !== NO_ENCONTRADO;
 }
 
-/** Id del botón que arranca la Task 23. No abre el modal acá: ver `bot.ts`. */
+/** Id del botón que arranca la Task 23. No abre el modal acá: ver `bot.tsx`. */
 export const ID_BOTON_FECHA = "cargar-datos";
 export const TEXTO_BOTON_FECHA = "Cargar fecha y hora";
 
@@ -116,3 +116,26 @@ export const FOTO_SIN_DESCARGAR = "No pude descargar esa imagen desde Slack. Pro
 /** El estado del thread no existe o no valida (TTL vencido, o versión vieja del schema). */
 export const SIN_ESTADO =
   "Perdí el contexto de esta conversación — mandame de nuevo el nombre del invitado para arrancar.";
+
+/**
+ * La foto llegó y es válida, pero el copy sigue en `NO_ENCONTRADO`: falta el
+ * único dato que el bot no puede conseguir solo.
+ *
+ * Existe porque el silencio es el peor modo de falla de este bot: el humano no
+ * distingue "la guardé y espero otra cosa" de "se rompió". Antes acá no se
+ * publicaba nada y era indistinguible del bug que motivó todo el turno 2.
+ */
+export function mensajeFotoSinCopy(nombre: string): string {
+  return (
+    `Foto guardada. Todavía me falta a qué se dedica *${nombre}* — ` +
+    `contame y con eso armo el copy y seguimos.`
+  );
+}
+
+/**
+ * Llegó algo que no es ni foto usable ni texto: un PDF, un sticker, un mensaje
+ * que queda vacío al recortarlo. Mismo motivo que arriba — contestar algo es
+ * mejor que dejarlo pensando si el bot lo vio.
+ */
+export const NO_ENTENDI =
+  "No pude usar eso. Mandame una foto como JPG o PNG, o escribime el dato que falta.";

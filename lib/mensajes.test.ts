@@ -11,6 +11,8 @@ import {
   mensajeErrorBusqueda,
   extraerFotoAdjunta,
   listoParaFecha,
+  mensajeFotoSinCopy,
+  NO_ENTENDI,
 } from "./mensajes";
 
 describe("mensajeNombreLargo", () => {
@@ -164,5 +166,28 @@ describe("ID_BOTON_FECHA", () => {
   // Literal exacto que pide el brief — el handler de la Task 23 lo matchea.
   it("es 'cargar-datos'", () => {
     expect(ID_BOTON_FECHA).toBe("cargar-datos");
+  });
+});
+
+describe("mensajeFotoSinCopy", () => {
+  // El Critical de la review de la Task 22: con la foto válida y el copy en
+  // NO_ENCONTRADO no se publicaba nada, y para el humano eso es idéntico al
+  // bug que motivó el turno 2 — mandó algo y no pasó nada.
+  it("confirma que guardó la foto", () => {
+    expect(mensajeFotoSinCopy("Naomi Couriel")).toContain("Foto guardada");
+  });
+
+  it("pide el dato que falta, nombrando a la persona", () => {
+    expect(mensajeFotoSinCopy("Naomi Couriel")).toContain("Naomi Couriel");
+  });
+
+  it("no filtra el literal del protocolo", () => {
+    expect(mensajeFotoSinCopy("Naomi Couriel")).not.toContain(NO_ENCONTRADO);
+  });
+});
+
+describe("NO_ENTENDI", () => {
+  it("dice qué mandar en vez de solo avisar que falló", () => {
+    expect(NO_ENTENDI).toMatch(/JPG|PNG/);
   });
 });

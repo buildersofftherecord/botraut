@@ -5,7 +5,7 @@ import { defineConfig } from "vitest/config";
  * con oxc, así que un bloque `esbuild` se ignora en silencio.
  *
  * Este proyecto tiene DOS runtimes de JSX conviviendo:
- *   - `chat` (el default de tsconfig) para las cards de Slack en bot.ts
+ *   - `chat` (el default de tsconfig) para las cards de Slack en bot.tsx
  *   - `react` para el template, porque Satori consume elementos de React
  *
  * Los archivos de `marca/` llevan `@jsxImportSource react` como pragma en la
