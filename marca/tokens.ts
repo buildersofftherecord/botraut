@@ -29,12 +29,23 @@ export const COLOR = {
  */
 export const NOMBRE_COLOR = "#a5a5a5";
 
-/** De `.hud-corner` y `.hud-label`, más `--fs-hud` y `--tr-hud`. */
+/**
+ * De `.hud-corner` y `.hud-label`, más `--fs-hud` y `--tr-hud`.
+ *
+ * `labelTamano` es la excepción: el `11` de la landing se portó tal cual y en
+ * una imagen de 1080px queda tímido. Medido sobre la referencia, sus etiquetas
+ * ocupan 1.34% del ancho por carácter y las nuestras 0.74% — o sea que todo el
+ * texto chico de la placa estaba a la mitad de tamaño, y con él se achicaba la
+ * caja de datos, que se dimensiona por su contenido.
+ *
+ * 11px son razonables en un viewport de escritorio; una placa no es un
+ * viewport.
+ */
 export const HUD = {
   esquinaLado: 26,
   esquinaBorde: 1,
   esquinaColor: "rgba(255,255,255,0.8)",
-  labelTamano: 11,
+  labelTamano: 20,
   labelTracking: "0.16em",
 } as const;
 

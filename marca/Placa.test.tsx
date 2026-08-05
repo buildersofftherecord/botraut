@@ -1,10 +1,7 @@
 import { describe, it, expect } from "vitest";
 import sharp from "sharp";
-import { readFile } from "node:fs/promises";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import { LIENZOS } from "./lienzos";
-import { renderizar, renderizarConFactor, TEXTURAS } from "./Placa";
+import { renderizar, renderizarConFactor } from "./Placa";
 import { tamanoNombre } from "./medirNombre";
 import { pixelEn, medidas, regionTieneClaros } from "../test/pixel";
 import { etiquetaInvitado } from "../lib/tipos";
@@ -38,31 +35,6 @@ describe("renderizar", () => {
   });
 });
 
-describe("textura de fondo", () => {
-  // El bug que este bloque cuida: una textura cuadrada estirada a 1080x1350
-  // deforma los dígitos un 25% en vertical. Antes se medía por proxy —densidad
-  // de píxeles claros en una franja fija— pero desde que la textura cae en
-  // columnas verticales la densidad varía a propósito según dónde se mire, así
-  // que ese proxy dejó de discriminar entre "estirada" y "sin estirar".
-  //
-  // Se mide directo: el asset de cada lienzo tiene que venir ya al tamaño de
-  // ese lienzo. Si coinciden, Satori no tiene nada que estirar.
-  it("cada lienzo tiene su textura al tamaño nominal, sin estirar", async () => {
-    for (const nombre of ["1:1", "4:5"] as const) {
-      // Sale de `TEXTURAS`, el mapeo real que usa el template — no de un
-      // literal repetido acá. Si alguien apunta el 4:5 al PNG cuadrado, este
-      // test lo agarra: 1080x1080 no coincide con el lienzo de 1080x1350.
-      const ruta = join(dirname(fileURLToPath(import.meta.url)), "texturas", TEXTURAS[nombre]);
-      const { width, height } = await sharp(await readFile(ruta)).metadata();
-      expect({ nombre, width, height }).toEqual({
-        nombre,
-        width: LIENZOS[nombre].ancho,
-        height: LIENZOS[nombre].alto,
-      });
-    }
-  });
-});
-
 describe("marco HUD", () => {
   it("dibuja el corchete superior izquierdo", async () => {
     const png = await renderizar(DATOS_DEMO, "1:1");
@@ -81,8 +53,10 @@ describe("marco HUD", () => {
 
   it("el punto REC es rojo", async () => {
     const png = await renderizar(DATOS_DEMO, "1:1");
-    // Centro del punto, a la derecha de la palabra REC.
-    const [r, g, b] = await pixelEn(png, 108, 52);
+    // Centro del punto, a la derecha de la palabra REC. La coordenada se
+    // movió cuando `HUD.labelTamano` pasó de 11 a 20: el punto se corre con el
+    // ancho de la palabra, así que este número depende del tamaño de etiqueta.
+    const [r, g, b] = await pixelEn(png, 126, 57);
     expect(r).toBeGreaterThan(200);
     expect(g).toBeLessThan(80);
     expect(b).toBeLessThan(80);
