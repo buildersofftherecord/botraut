@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import type { Attachment } from "chat";
 import { etiquetaInvitado, type Copy } from "./tipos";
 import { PEDIDO_DE_FOTO } from "./foto";
 
@@ -40,15 +41,78 @@ export function mensajeNoEncontrado(nombre: string): string {
 }
 
 /**
- * Decide qué se publica después de buscar el copy. Vive acá y no adentro del
- * handler para que la rama de `NO_ENCONTRADO` se pueda testear sin mockear el
- * Chat SDK — un mock de librería externa ya escondió un bug real en este
- * proyecto (ver `lib/recorte.ts`).
+ * Decide qué se publica después de buscar (o rehacer) el copy. Vive acá y no
+ * adentro del handler para que la rama de `NO_ENCONTRADO` se pueda testear
+ * sin mockear el Chat SDK — un mock de librería externa ya escondió un bug
+ * real en este proyecto (ver `lib/recorte.ts`).
  *
  * Cuando no hay copy no se pide la foto: primero se resuelve el rol, así el
- * humano contesta una cosa por vez.
+ * humano contesta una cosa por vez. `pedirFoto` en `false` cubre los otros
+ * dos casos en los que no hace falta pedirla: ya vino adjunta al mismo
+ * mensaje que el nombre (turno 1, opción C), o ya se validó en un turno
+ * anterior y esto es una corrección de texto (turno 2).
  */
-export function mensajeCopy(nombre: string, copy: Copy): string {
+export function mensajeCopy(nombre: string, copy: Copy, opciones?: { pedirFoto?: boolean }): string {
   if (copy.rol === NO_ENCONTRADO) return mensajeNoEncontrado(nombre);
-  return `*${nombre}* — ${etiquetaInvitado(copy.genero)}\n${copy.rol}\n\n${PEDIDO_DE_FOTO}`;
+  const pedirFoto = opciones?.pedirFoto ?? true;
+  const pie = pedirFoto ? `\n\n${PEDIDO_DE_FOTO}` : "";
+  return `*${nombre}* — ${etiquetaInvitado(copy.genero)}\n${copy.rol}${pie}`;
 }
+
+/**
+ * El mismo mensaje de error, para `buscarCopy` (turno 1) y `rehacerCopy`
+ * (turno 2, corrección) — ninguno de los dos traduce sus errores (a
+ * diferencia de `recorte.ts`/`foto.ts`), así que el handler necesita este
+ * mismo texto en los dos catch. La causa cruda de Gemini/AI SDK nunca llega
+ * hasta acá: eso lo loguea el handler con `console.error` antes de llamar a
+ * esto.
+ */
+export function mensajeErrorBusqueda(nombre: string, verbo: "armar" | "rehacer" = "armar"): string {
+  return (
+    `No pude ${verbo} el copy de *${nombre}*: se cayó la búsqueda (Gemini, cuota o red). ` +
+    `Probá de nuevo en un rato.`
+  );
+}
+
+/**
+ * Busca el primer adjunto utilizable como foto de invitado: tiene que ser
+ * imagen, con `url` (lo que se guarda en el estado para la Task 23) y
+ * `fetchData` (lo que hace falta para bajarla ahora — el adapter de Slack
+ * solo lo define cuando hay `url`, así que en la práctica van juntos, pero
+ * el chequeo no asume esa relación interna del adapter).
+ *
+ * Sirve para las dos entradas de foto: el turno 1 (nombre + foto en el mismo
+ * mensaje) y el turno 2 (foto sola, en un mensaje posterior) comparten esta
+ * función en vez de duplicar la detección.
+ */
+export function extraerFotoAdjunta(attachments?: Attachment[]): Attachment | undefined {
+  return attachments?.find((a) => a.type === "image" && Boolean(a.url) && Boolean(a.fetchData));
+}
+
+/**
+ * Si ya hay copy y foto, falta un solo paso antes de la placa: cargar fecha
+ * y hora. Con `NO_ENCONTRADO` el copy no está resuelto todavía — aunque la
+ * foto ya haya llegado y validado, no tiene sentido ofrecer el botón antes
+ * de saber a qué se dedica la persona.
+ */
+export function listoParaFecha(copy: Copy): boolean {
+  return copy.rol !== NO_ENCONTRADO;
+}
+
+/** Id del botón que arranca la Task 23. No abre el modal acá: ver `bot.ts`. */
+export const ID_BOTON_FECHA = "cargar-datos";
+export const TEXTO_BOTON_FECHA = "Cargar fecha y hora";
+
+/**
+ * Adjunto sin `url` o sin `fetchData` — no debería pasar con el adapter de
+ * Slack real (ver `extraerFotoAdjunta`), pero si pasa no hay bytes que
+ * validar ni referencia que guardar.
+ */
+export const FOTO_SIN_URL = "No pude leer esa imagen — mandámela de nuevo, como JPG o PNG.";
+
+/** `fetchData()` falló contra la API de Slack (red, token, scope). */
+export const FOTO_SIN_DESCARGAR = "No pude descargar esa imagen desde Slack. Probá mandarla de nuevo.";
+
+/** El estado del thread no existe o no valida (TTL vencido, o versión vieja del schema). */
+export const SIN_ESTADO =
+  "Perdí el contexto de esta conversación — mandame de nuevo el nombre del invitado para arrancar.";

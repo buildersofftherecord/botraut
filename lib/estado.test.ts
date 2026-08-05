@@ -38,4 +38,27 @@ describe("EstadoThreadSchema", () => {
       EstadoThreadSchema.parse({ nombre: "Naomi Couriel", copy: copyIncompleto }),
     ).toThrow();
   });
+
+  // El caso normal entre el turno 1 y el 2: el estado existe sin foto
+  // todavía. Sin `.optional()` esto rechazaría lo que ya está en producción.
+  it("acepta un estado sin foto", () => {
+    const estado = { nombre: "Naomi Couriel", copy };
+    expect(() => EstadoThreadSchema.parse(estado)).not.toThrow();
+  });
+
+  it("acepta un estado con foto bien formada", () => {
+    const foto = { url: "https://files.slack.com/foto.jpg", fuente: "Naomi", ancho: 1200, alto: 1600 };
+    const estado = { nombre: "Naomi Couriel", copy, foto };
+    expect(EstadoThreadSchema.parse(estado)).toEqual(estado);
+  });
+
+  // Igual que con `copy`: sin este caso, un `foto: z.any()` (o sacarle el
+  // `.min(800)` a `FotoSchema`) pasaría todos los demás tests igual, porque
+  // ninguno manda una foto inválida junto a un nombre y copy válidos.
+  it("rechaza una foto por debajo del mínimo aunque el resto sea válido", () => {
+    const fotoChica = { url: "https://files.slack.com/foto.jpg", ancho: 400, alto: 400 };
+    expect(() =>
+      EstadoThreadSchema.parse({ nombre: "Naomi Couriel", copy, foto: fotoChica }),
+    ).toThrow();
+  });
 });
