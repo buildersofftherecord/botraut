@@ -11,6 +11,19 @@ async function rojo(): Promise<Buffer> {
     .toBuffer();
 }
 
+/**
+ * `metadata().hasAlpha` solo confirma que existe un cuarto canal — una
+ * imagen forzada a 100% opaca (`removeAlpha().ensureAlpha(1)`) también lo
+ * tiene y ese chequeo no lo detecta. Esto lee el byte real.
+ */
+async function alfaEn(png: Buffer, x: number, y: number): Promise<number> {
+  const { data } = await sharp(png)
+    .extract({ left: x, top: y, width: 1, height: 1 })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  return data[3];
+}
+
 describe("aBlancoYNegro", () => {
   it("deja los tres canales iguales", async () => {
     const [r, g, b] = await pixelEn(await aBlancoYNegro(await rojo()), 100, 200);
@@ -25,7 +38,7 @@ describe("aBlancoYNegro", () => {
       .png()
       .toBuffer();
     const salida = await aBlancoYNegro(conAlpha);
-    expect((await sharp(salida).metadata()).hasAlpha).toBe(true);
+    expect(await alfaEn(salida, 25, 25)).toBe(0);
   });
 });
 
