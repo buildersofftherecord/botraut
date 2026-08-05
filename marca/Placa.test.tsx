@@ -171,6 +171,37 @@ async function fotoFalsa(): Promise<Buffer> {
     .toBuffer();
 }
 
+describe("supersampling", () => {
+  it("devuelve el lienzo al tamaño nominal, no al doble", async () => {
+    const png = await renderizar(DATOS_DEMO, "1:1");
+    expect(await medidas(png)).toEqual({ ancho: 1080, alto: 1080 });
+  });
+
+  it("los bordes de la tipografía tienen más gradación que sin supersampling", async () => {
+    // La medida de "pixelado" es cuántos niveles de gris intermedios hay en el
+    // borde de una letra: pocos niveles = escalones visibles. Se mide sobre la
+    // "N" de NAOMI, que es un asta vertical gruesa y estable.
+    const png = await renderizar(DATOS_DEMO, "1:1");
+    const { data } = await sharp(png)
+      .extract({ left: 68, top: 225, width: 130, height: 90 })
+      .greyscale()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const niveles = new Set(data).size;
+    // Sin supersampling el mismo recorte da ~160. El umbral deja margen para
+    // que un ajuste de tipografía no lo rompa por dos niveles.
+    expect(niveles).toBeGreaterThan(200);
+  });
+
+  it("sigue siendo determinista", async () => {
+    const [a, b] = await Promise.all([
+      renderizar(DATOS_DEMO, "1:1"),
+      renderizar(DATOS_DEMO, "1:1"),
+    ]);
+    expect(a.equals(b)).toBe(true);
+  });
+});
+
 describe("foto", () => {
   it("sin foto renderiza igual (la foto es opcional)", async () => {
     const png = await renderizar(DATOS_DEMO, "1:1");
