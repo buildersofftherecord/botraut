@@ -2,7 +2,7 @@ import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
 import { CopySchema, type Copy } from "./tipos";
 
-const MODELO = process.env.MODELO_COPY ?? "gemini-3.6-flash";
+const MODELO = process.env.MODELO_COPY ?? "gemini-3.5-flash-lite";
 
 /**
  * El spike de la Task 14 midió que el modelo inventa antes que admitir que no

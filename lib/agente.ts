@@ -7,7 +7,14 @@ import { PlacaSchema, InvitadoSchema, CopySchema } from "./tipos";
 import { NO_ENCONTRADO } from "./mensajes";
 import { EstadoThreadSchema } from "./estado";
 
-const MODELO = process.env.MODELO_COPY ?? "gemini-3.6-flash";
+/**
+ * `gemini-3.6-flash` tiene 20 pedidos por dia en el tier gratis, y un agente
+ * gasta varios por conversacion: se agotaba antes de la segunda placa.
+ * `gemini-3.5-flash-lite` responde y llama herramientas bien — probado contra
+ * la API real, armo un generar_placa completo a partir de una conversacion
+ * desordenada.
+ */
+const MODELO = process.env.MODELO_COPY ?? "gemini-3.5-flash-lite";
 
 /**
  * Lo mínimo que el agente necesita del thread. Se define acá y no se importa
@@ -111,7 +118,22 @@ export function crearHerramientas(conv: Conversacion) {
           enVivo: datos.enVivo,
         });
 
-        const { png } = await generarPlaca(placa);
+        let png: Buffer;
+        try {
+          ({ png } = await generarPlaca(placa));
+        } catch (e) {
+          // Lo que devuelva esta herramienta lo va a repetir el agente al
+          // humano, así que acá se corta cualquier texto técnico. `descargar()`
+          // tira cosas como `descarga: HTTP 400 en <url>` — que además filtra
+          // la URL del archivo privado de Slack.
+          console.error(`generarPlaca falló para "${datos.nombre}"`, e);
+          return {
+            ok: false,
+            motivo:
+              "No se pudo armar la placa con esa foto. Pedile al humano que mande otra.",
+          };
+        }
+
         await conv.publicarPlaca(datos.nombre, png);
         await conv.guardar({ nombre: datos.nombre, copy: CopySchema.parse({ ...datos, fuentes: [] }) });
         return { ok: true };

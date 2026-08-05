@@ -2,7 +2,7 @@ import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
 import { z } from "zod";
 
-const MODELO = process.env.MODELO_VISION ?? "gemini-3.6-flash";
+const MODELO = process.env.MODELO_VISION ?? "gemini-3.5-flash";
 
 export type Veredicto = { sirve: true } | { sirve: false; motivo: string };
 

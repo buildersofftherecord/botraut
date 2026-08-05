@@ -117,3 +117,30 @@ describe("generar_placa", () => {
     expect(datos.enVivo).toBe(true);
   });
 });
+
+describe("generar_placa — errores hacia el humano", () => {
+  // Lo que devuelve la herramienta lo repite el agente en el canal. `descargar()`
+  // tira `descarga: HTTP 400 en <url>`, que además filtra la URL del archivo
+  // privado de Slack. Medido en una corrida real contra Gemini: el agente
+  // publicó ese texto crudo tal cual.
+  it("no filtra el texto tecnico ni la url cuando el render falla", async () => {
+    generarPlaca.mockRejectedValue(
+      new Error("descarga: HTTP 400 en https://files.slack.com/secreto.jpg"),
+    );
+    const conv = conversacionFalsa({
+      nombre: "Guillermo Rauch",
+      copy: { rol: "CEO de Vercel", genero: "m", fuentes: [] },
+      foto: FOTO,
+    });
+    const h = crearHerramientas(conv);
+
+    const r = (await h.generar_placa.execute(DATOS_COMPLETOS, {} as never)) as {
+      ok: boolean;
+      motivo?: string;
+    };
+
+    expect(r.ok).toBe(false);
+    expect(r.motivo).not.toMatch(/HTTP|descarga:|files\.slack\.com/);
+    expect(conv.publicadas).toHaveLength(0);
+  });
+});
