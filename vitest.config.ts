@@ -15,6 +15,11 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
+    // Sin esto, el historial de llamadas de un mock sobrevive de un test al
+    // siguiente y la independencia entre tests queda librada al orden de
+    // ejecución. Se descubrió en `recorte.test.ts`: un test pasaba por la razón
+    // correcta, pero por casualidad.
+    clearMocks: true,
     include: ["**/*.test.ts", "**/*.test.tsx"],
     exclude: ["node_modules/**", ".next/**"],
   },
