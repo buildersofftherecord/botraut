@@ -1,67 +1,46 @@
 import { describe, it, expect } from "vitest";
 import { EstadoThreadSchema } from "./estado";
 
-const copy = {
-  rol: "AI Engineering en UdeSA y Data & AI en Ualá",
-  genero: "f",
-  fuentes: ["https://ejemplo.com/n"],
+const FOTO = {
+  url: "https://files.slack.com/files-pri/T0/F0/guillermo.png",
+  fuente: "U0BMV11HNH2",
+  ancho: 848,
+  alto: 1264,
 };
 
 describe("EstadoThreadSchema", () => {
-  it("acepta un estado bien formado", () => {
-    const estado = { nombre: "Naomi Couriel", copy };
-    expect(EstadoThreadSchema.parse(estado)).toEqual(estado);
+  it("acepta un estado con la foto guardada", () => {
+    expect(EstadoThreadSchema.parse({ foto: FOTO }).foto).toEqual(FOTO);
   });
 
-  // Límite exacto: sin este caso, un `.max(24)` corrido a `.max(23)` por error
-  // pasaría todos los tests igual — ningún otro fixture toca el borde.
-  it("acepta un nombre de exactamente 24 caracteres", () => {
-    const nombre = "a".repeat(24);
-    expect(() => EstadoThreadSchema.parse({ nombre, copy })).not.toThrow();
+  // El caso normal antes de que el humano suba nada: el thread existe y
+  // todavía no hay foto. Sin `.optional()` esto rechazaría media conversación.
+  it("acepta un estado vacío", () => {
+    expect(EstadoThreadSchema.parse({}).foto).toBeUndefined();
   });
 
-  it("rechaza un nombre de más de 24 caracteres", () => {
-    const nombre = "a".repeat(25);
-    expect(() => EstadoThreadSchema.parse({ nombre, copy })).toThrow();
+  /**
+   * El bug que motivó reescribir este schema: pedía `nombre` y `copy`, que el
+   * agente dejó de escribir cuando la conversación pasó a ser la memoria. Un
+   * estado con la foto guardada fallaba el parseo, y `generar_placa` traducía
+   * ese fallo a "no hay foto validada" — mintiéndole al humano, que la había
+   * subido bien.
+   */
+  it("no exige nombre ni copy: eso vive en la conversación", () => {
+    expect(() => EstadoThreadSchema.parse({ foto: FOTO })).not.toThrow();
+  });
+
+  // De Redis vuelve JSON sin tipo. Si esto pasara, una foto a medias llegaría
+  // como `any` hasta romper adentro del render, lejos de la causa.
+  it("rechaza una foto sin las medidas", () => {
+    expect(() => EstadoThreadSchema.parse({ foto: { url: FOTO.url } })).toThrow();
+  });
+
+  it("rechaza una foto con una url que no es url", () => {
+    expect(() => EstadoThreadSchema.parse({ foto: { ...FOTO, url: "guillermo.png" } })).toThrow();
   });
 
   it("rechaza lo que vuelve de Redis mal formado", () => {
-    expect(() => EstadoThreadSchema.parse(JSON.parse('{"nombre":null}'))).toThrow();
-  });
-
-  // Un `copy: z.any()` (o cualquier degradación de CopySchema) dejaría pasar
-  // esto igual que los casos de arriba, porque ninguno manda un copy inválido
-  // junto a un nombre válido. Este es el único que lo hace.
-  it("rechaza un copy incompleto aunque el nombre sea válido", () => {
-    // Falta `rol`, que es el único campo del copy sin default: `fuentes`
-    // ahora vale vacío a propósito, porque exigir una URL obligaba al modelo
-    // a inventarla.
-    const copyIncompleto = { genero: "f", fuentes: [] };
-    expect(() =>
-      EstadoThreadSchema.parse({ nombre: "Naomi Couriel", copy: copyIncompleto }),
-    ).toThrow();
-  });
-
-  // El caso normal entre el turno 1 y el 2: el estado existe sin foto
-  // todavía. Sin `.optional()` esto rechazaría lo que ya está en producción.
-  it("acepta un estado sin foto", () => {
-    const estado = { nombre: "Naomi Couriel", copy };
-    expect(() => EstadoThreadSchema.parse(estado)).not.toThrow();
-  });
-
-  it("acepta un estado con foto bien formada", () => {
-    const foto = { url: "https://files.slack.com/foto.jpg", fuente: "Naomi", ancho: 1200, alto: 1600 };
-    const estado = { nombre: "Naomi Couriel", copy, foto };
-    expect(EstadoThreadSchema.parse(estado)).toEqual(estado);
-  });
-
-  // Igual que con `copy`: sin este caso, un `foto: z.any()` (o sacarle el
-  // `.min(800)` a `FotoSchema`) pasaría todos los demás tests igual, porque
-  // ninguno manda una foto inválida junto a un nombre y copy válidos.
-  it("rechaza una foto por debajo del mínimo aunque el resto sea válido", () => {
-    const fotoChica = { url: "https://files.slack.com/foto.jpg", ancho: 400, alto: 400 };
-    expect(() =>
-      EstadoThreadSchema.parse({ nombre: "Naomi Couriel", copy, foto: fotoChica }),
-    ).toThrow();
+    expect(() => EstadoThreadSchema.parse(JSON.parse('{"foto":null}'))).toThrow();
   });
 });

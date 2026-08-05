@@ -3,7 +3,7 @@ import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { buscarCopy } from "./buscar";
 import { generarPlaca } from "./generar";
-import { PlacaSchema, InvitadoSchema, CopySchema } from "./tipos";
+import { PlacaSchema, InvitadoSchema } from "./tipos";
 import { NO_ENCONTRADO } from "./mensajes";
 import { EstadoThreadSchema } from "./estado";
 
@@ -101,7 +101,15 @@ export function crearHerramientas(conv: Conversacion) {
       execute: async (datos) => {
         const crudo = await conv.estado();
         const estado = EstadoThreadSchema.safeParse(crudo);
-        if (!estado.success || !estado.data.foto) {
+        // Se distinguen los dos casos a propósito. Antes cualquier fallo de
+        // parseo se traducía a "no hay foto", y eso mintió: la foto estaba
+        // guardada y lo que fallaba era el schema, que todavía exigía campos
+        // que el agente dejó de escribir.
+        if (!estado.success) {
+          console.error("estado del thread ilegible", estado.error, crudo);
+          return { ok: false, motivo: "El estado de este thread quedó ilegible. Que suba la foto de nuevo." };
+        }
+        if (!estado.data.foto) {
           return { ok: false, motivo: "Todavía no hay una foto validada en este thread." };
         }
 
@@ -135,7 +143,6 @@ export function crearHerramientas(conv: Conversacion) {
         }
 
         await conv.publicarPlaca(datos.nombre, png);
-        await conv.guardar({ nombre: datos.nombre, copy: CopySchema.parse({ ...datos, fuentes: [] }) });
         return { ok: true };
       },
     }),
