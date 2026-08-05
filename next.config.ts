@@ -27,7 +27,17 @@ const nextConfig: NextConfig = {
    *   python3 -c "import json;d=json.load(open('.next/server/app/api/slack/route.js.nft.json'));print(len([x for x in d['files'] if 'imgly' in x]))"
    */
   outputFileTracingIncludes: {
-    "/api/slack": ["./node_modules/@imgly/background-removal-node/dist/**/*"],
+    "/api/slack": [
+      "./node_modules/@imgly/background-removal-node/dist/**/*",
+      // El binding `.node` de onnxruntime se enlaza dinámicamente contra
+      // `libonnxruntime.so.1.17.3`, y un enlace dinámico de un binario es
+      // invisible para el trazador, que sigue `require`s de JavaScript. En
+      // Vercel eso daba, literal:
+      //   libonnxruntime.so.1.17.3: cannot open shared object file
+      // Solo `linux`: es la plataforma donde corre la función, y traer darwin y
+      // win32 sería cargar el despliegue con binarios que nunca se ejecutan.
+      "./node_modules/onnxruntime-node/bin/napi-v3/linux/**/*",
+    ],
   },
 };
 
