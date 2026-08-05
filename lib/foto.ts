@@ -18,11 +18,17 @@ const LADO_MINIMO = 800;
  * tener adentro una persona perfectamente vertical. Lo que importa es cuánta
  * resolución real tiene el sujeto una vez separado del fondo.
  *
- * Se compara contra el alto al que el render efectivamente lleva la silueta,
- * no contra el alto del lienzo: son distintos, y usar el crudo rechazaba
- * siluetas que el propio render iba a achicar igual.
+ * No es el alto al que el render lleva la silueta, sino **cuánto se le puede
+ * agrandar sin que se note**. Exigir el alto exacto de destino rechazaba fotos
+ * que salen bien: una silueta de 982px llevada a 1269 es un aumento de 1.29×,
+ * y con Lanczos eso no se ve. Rechazarla mandaba al humano a buscar otra foto
+ * por nada — el mismo sobre-rechazo que motivó la Task 22b.
+ *
+ * 1.45× es donde el escalado empieza a ablandar los bordes de forma visible.
+ * Por encima de eso sí conviene pedir otra.
  */
-const ALTO_MINIMO_SILUETA = altoDeFoto(LIENZOS["4:5"]);
+const AUMENTO_MAXIMO = 1.45;
+export const ALTO_MINIMO_SILUETA = Math.round(altoDeFoto(LIENZOS["4:5"]) / AUMENTO_MAXIMO);
 
 export type ResultadoValidacion =
   | { ok: true; foto: Pick<Foto, "ancho" | "alto"> }
@@ -111,8 +117,8 @@ export async function validarFoto(bytes: Buffer): Promise<ResultadoValidacion> {
       ok: false,
       motivo:
         `La persona en esa foto queda en ${silueta.alto}px de alto una vez separada ` +
-        `del fondo, y la placa necesita al menos ${ALTO_MINIMO_SILUETA}px para no ` +
-        `pixelarse. Acercate más al sacarla o mandame una de mayor resolución.`,
+        `del fondo, y necesito al menos ${ALTO_MINIMO_SILUETA}px para que no salga ` +
+        `blanda al agrandarla. Mandame una donde ocupe más del cuadro, o de mayor resolución.`,
     };
   }
 
@@ -134,4 +140,4 @@ export async function validarFoto(bytes: Buffer): Promise<ResultadoValidacion> {
 /** El texto que el bot postea cuando pide la foto por primera vez. */
 export const PEDIDO_DE_FOTO =
   "Mandame una foto donde se te vea de medio cuerpo para arriba, con el fondo lo más " +
-  "despejado posible y de 800px de lado o más — así no sale pixelada ni cortada en la placa.";
+  "despejado posible y de 1200px de lado o más — así la silueta queda nítida al recortarla.";

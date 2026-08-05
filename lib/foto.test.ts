@@ -16,12 +16,12 @@ vi.mock("./recorte", () => ({ recortar }));
 vi.mock("./silueta", () => ({ recortarASilueta }));
 vi.mock("./mirar", () => ({ mirarSilueta }));
 
-const { validarFoto, PEDIDO_DE_FOTO } = await import("./foto");
+const { validarFoto, PEDIDO_DE_FOTO, ALTO_MINIMO_SILUETA } = await import("./foto");
 const { LIENZOS, altoDeFoto } = await import("../marca/lienzos");
 
 // El alto al que el render efectivamente lleva la silueta, no el del lienzo:
 // son distintos, y el umbral se mide contra el primero.
-const ALTO_MINIMO = altoDeFoto(LIENZOS["4:5"]);
+const ALTO_MINIMO = ALTO_MINIMO_SILUETA;
 
 async function imagen(ancho: number, alto: number): Promise<Buffer> {
   return sharp({
@@ -106,6 +106,23 @@ describe("validarFoto — recorte de fondo (recortar)", () => {
     await validarFoto(await imagen(1200, 1200));
 
     expect(recortarASilueta).toHaveBeenCalledWith(recorteBuf);
+  });
+});
+
+describe("ALTO_MINIMO_SILUETA", () => {
+  // Valor literal a propósito: los tests de abajo lo usan para ubicarse en el
+  // borde, así que derivan de él y pasarían con cualquier número. Lo único que
+  // puede fijar el valor es escribirlo.
+  it("es 875px", () => {
+    expect(ALTO_MINIMO_SILUETA).toBe(875);
+  });
+
+  // El invariante real. Exigir el alto exacto al que el render lleva la
+  // silueta (1269) rechazaba fotos que salen bien: una de 982px se agranda
+  // 1.29× y con Lanczos no se nota. El umbral tiene que dejar margen de
+  // ampliación, no ser el destino.
+  it("deja margen para agrandar: es menor que el alto de destino", () => {
+    expect(ALTO_MINIMO_SILUETA).toBeLessThan(altoDeFoto(LIENZOS["4:5"]));
   });
 });
 
