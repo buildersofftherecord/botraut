@@ -21,8 +21,21 @@ import type { DatosPlaca } from "./tipos";
  * cuando Task 19 exista; el punto de enganche es este mismo `await` a
  * `renderizar`, no hace falta tocar el orden del pipeline para agregarlo.
  */
+/**
+ * `datos.fotoElegida.url` es una URL de archivo de Slack: privada, y sin
+ * este header Slack devuelve el HTML de su página de login en vez de la foto
+ * (ver `descargar()` en `procesar.ts`). Sin `SLACK_BOT_TOKEN` configurado,
+ * esto devuelve `undefined` a propósito — mejor que `descargar` reciba nada
+ * y falle por el chequeo de content-type (mensaje claro) a que mande un
+ * header literal `"Bearer undefined"`.
+ */
+function autorizacionSlack(): HeadersInit | undefined {
+  const token = process.env.SLACK_BOT_TOKEN;
+  return token ? { Authorization: `Bearer ${token}` } : undefined;
+}
+
 export async function generarPlaca(datos: DatosPlaca): Promise<{ png: Buffer }> {
-  const original = await descargar(datos.fotoElegida.url);
+  const original = await descargar(datos.fotoElegida.url, autorizacionSlack());
   const recortada = await recortar(original);
   const silueta = await recortarASilueta(recortada);
   const gris = await aBlancoYNegro(silueta.png);

@@ -52,4 +52,33 @@ describe("generarPlaca", () => {
     const { png } = await generarPlaca(DATOS_DEMO);
     expect(png.toString()).toBe("png");
   });
+
+  // La URL de la foto es un archivo privado de Slack (ver procesar.ts):
+  // sin este header, `descargar` recibe el HTML de la página de login en
+  // vez de la foto.
+  it("le pasa el header de autenticación de Slack a descargar", async () => {
+    const original = process.env.SLACK_BOT_TOKEN;
+    process.env.SLACK_BOT_TOKEN = "xoxb-test-123";
+    try {
+      const { descargar } = await import("./procesar");
+      await generarPlaca(DATOS_DEMO);
+      expect(descargar).toHaveBeenCalledWith(DATOS_DEMO.fotoElegida.url, {
+        Authorization: "Bearer xoxb-test-123",
+      });
+    } finally {
+      process.env.SLACK_BOT_TOKEN = original;
+    }
+  });
+
+  it("sin SLACK_BOT_TOKEN no manda un header inventado", async () => {
+    const original = process.env.SLACK_BOT_TOKEN;
+    delete process.env.SLACK_BOT_TOKEN;
+    try {
+      const { descargar } = await import("./procesar");
+      await generarPlaca(DATOS_DEMO);
+      expect(descargar).toHaveBeenCalledWith(DATOS_DEMO.fotoElegida.url, undefined);
+    } finally {
+      process.env.SLACK_BOT_TOKEN = original;
+    }
+  });
 });
