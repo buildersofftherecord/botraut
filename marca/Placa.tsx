@@ -29,6 +29,29 @@ const SUPERMUESTREO = 2;
 
 const aca = dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Una textura por lienzo, no una estirada. Un PNG cuadrado escalado a 1080×1350
+ * deforma los dígitos un 25% en vertical y arruina el trabajo de sutileza de la
+ * Task 11. Los assets se committean al tamaño *nominal* del lienzo (no al
+ * doble del supermuestreo): así siguen el mismo camino que ya recorre
+ * `binario.png` para el 1:1 — Satori los estira al lienzo de render (que sí
+ * está a 2x) y el Lanczos final los vuelve a bajar junto con todo lo demás.
+ * Generarlos ya al doble no ahorra nada porque no hay información extra que
+ * ganar escalando un PNG, y acoplaría el asset committeado a un detalle
+ * interno (`SUPERMUESTREO`) que Task 11b puede volver a cambiar.
+ *
+ * `9:16` y `16:9` no tienen asset todavía: son lienzos no activados. Que el
+ * `readFile` de más abajo tire ENOENT es el comportamiento correcto — un
+ * lienzo sin su textura tiene que romper en desarrollo, no renderizar
+ * estirado en producción.
+ */
+const TEXTURAS: Record<NombreLienzo, string> = {
+  "1:1": "binario.png",
+  "4:5": "binario-4x5.png",
+  "9:16": "binario-9x16.png",
+  "16:9": "binario-16x9.png",
+};
+
 export const DATOS_DEMO: DatosPlaca = {
   invitado: {
     nombre: "Naomi Couriel",
@@ -81,7 +104,7 @@ export async function renderizarConFactor(
 
   const anchoColumna = l.ancho * (1 - l.fotoAncho) - l.margen - 40 * s;
   const sticker = await readFile(join(aca, "svg", "botr-sticker.svg"));
-  const binario = await readFile(join(aca, "texturas", "binario.png"));
+  const binario = await readFile(join(aca, "texturas", TEXTURAS[nombreLienzo]));
   const [fuentes, tamanoDelNombre] = await Promise.all([
     cargarFuentes(),
     tamanoNombre(datos.invitado.nombre, anchoColumna, l.nombreTamano),

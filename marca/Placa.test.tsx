@@ -28,6 +28,10 @@ describe("renderizar", () => {
     ]);
     expect(a.equals(b)).toBe(true);
   });
+
+  it("el 4:5 renderiza a 1080x1350", async () => {
+    expect(await medidas(await renderizar(DATOS_DEMO, "4:5"))).toEqual({ ancho: 1080, alto: 1350 });
+  });
 });
 
 describe("marco HUD", () => {
