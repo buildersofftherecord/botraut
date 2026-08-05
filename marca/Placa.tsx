@@ -14,12 +14,16 @@ import { tamanoNombre, NOMBRE_LETTER_SPACING_EM } from "./medirNombre";
 
 /**
  * Satori antialiasa a 1x y los bordes de la tipografía display quedan
- * escalonados a simple vista. Renderizar al doble y bajar con Lanczos da
- * gradación real: medido, el borde de una letra pasa de ~160 a ~223 niveles
- * de gris distintos.
+ * escalonados a simple vista. Renderizar al doble de resolución y bajar con
+ * Lanczos da gradación real en el borde — medido en `Placa.test.tsx`,
+ * comparando el mismo recorte con y sin supersampling, no contra un número
+ * fijo (ese número depende de qué letra caiga en el recorte, no de la
+ * calidad del antialiasing).
  *
- * No se resuelve agrandando el lienzo de salida: Instagram recomprime todo lo
- * que supere 1080 de ancho, así que la salida tiene que seguir siendo 1080.
+ * No se resuelve agrandando el lienzo de *salida*: Instagram recomprime todo
+ * lo que supere 1080 de ancho, así que lo que se entrega tiene que seguir
+ * siendo 1080. El de más resolución es un paso intermedio que se descarta
+ * al bajar con Lanczos, no el archivo final.
  */
 const SUPERMUESTREO = 2;
 
@@ -44,16 +48,25 @@ export const DATOS_DEMO: DatosPlaca = {
 };
 
 /**
+ * Cuerpo real de `renderizar`, parametrizado por el factor de supersampling.
+ * Separado así para que `Placa.test.tsx` pueda comparar factor 1 contra
+ * factor 2 sobre el mismo recorte de píxeles — la única forma honesta de
+ * medir que el supersampling mejora algo, en vez de comparar contra un
+ * número fijo que depende del contenido del recorte. Nada fuera de los
+ * tests debería llamar a esta función: el factor es un detalle interno,
+ * `renderizar` de abajo lo fija en `SUPERMUESTREO` y no lo expone.
+ *
  * `fotoPng` viene ya recortada y en B/N: Satori no soporta `filter`, así que
  * toda transformación de imagen pasa por sharp antes de llegar acá.
  */
-export async function renderizar(
+export async function renderizarConFactor(
   datos: DatosPlaca,
   nombreLienzo: NombreLienzo,
+  factor: number,
   fotoPng?: Buffer,
 ): Promise<Buffer> {
   const nominal = LIENZOS[nombreLienzo];
-  const s = SUPERMUESTREO;
+  const s = factor;
 
   // Todas las medidas que el template usa en px se escalan juntas. Si alguna
   // queda sin escalar, ese elemento sale a la mitad de tamaño relativo.
@@ -254,4 +267,13 @@ export async function renderizar(
     .resize(nominal.ancho, nominal.alto, { kernel: sharp.kernel.lanczos3 })
     .png()
     .toBuffer();
+}
+
+/** Punto de entrada público: fija el factor de supersampling, no lo expone. */
+export async function renderizar(
+  datos: DatosPlaca,
+  nombreLienzo: NombreLienzo,
+  fotoPng?: Buffer,
+): Promise<Buffer> {
+  return renderizarConFactor(datos, nombreLienzo, SUPERMUESTREO, fotoPng);
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import sharp from "sharp";
-import { renderizar, DATOS_DEMO } from "./Placa";
+import { renderizar, renderizarConFactor, DATOS_DEMO } from "./Placa";
 import { tamanoNombre } from "./medirNombre";
 import { pixelEn, medidas, regionTieneClaros } from "../test/pixel";
 import { etiquetaInvitado } from "../lib/tipos";
@@ -178,19 +178,26 @@ describe("supersampling", () => {
   });
 
   it("los bordes de la tipografía tienen más gradación que sin supersampling", async () => {
-    // La medida de "pixelado" es cuántos niveles de gris intermedios hay en el
-    // borde de una letra: pocos niveles = escalones visibles. Se mide sobre la
-    // "N" de NAOMI, que es un asta vertical gruesa y estable.
-    const png = await renderizar(DATOS_DEMO, "1:1");
-    const { data } = await sharp(png)
-      .extract({ left: 68, top: 225, width: 130, height: 90 })
-      .greyscale()
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-    const niveles = new Set(data).size;
-    // Sin supersampling el mismo recorte da ~160. El umbral deja margen para
-    // que un ajuste de tipografía no lo rompa por dos niveles.
-    expect(niveles).toBeGreaterThan(200);
+    // Comparación A/B contra un número fijo, no contra un umbral absoluto:
+    // "cuántos niveles de gris hay en este recorte" depende de qué letra cae
+    // ahí (una asta recta da poca gradación aunque el antialiasing sea
+    // perfecto, una curva da mucha), así que un número fijo mide el
+    // contenido del recorte, no la calidad del supersampling. Lo que sí es
+    // una medida válida es si el mismo recorte, del mismo render, gana
+    // gradación al subir el factor de 1 a 2.
+    const contarNiveles = async (factor: number) => {
+      const png = await renderizarConFactor(DATOS_DEMO, "1:1", factor);
+      const { data } = await sharp(png)
+        .extract({ left: 68, top: 225, width: 130, height: 90 })
+        .greyscale()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      return new Set(data).size;
+    };
+
+    const sinSupersampling = await contarNiveles(1);
+    const conSupersampling = await contarNiveles(2);
+    expect(conSupersampling).toBeGreaterThan(sinSupersampling);
   });
 
   it("sigue siendo determinista", async () => {
