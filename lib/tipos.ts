@@ -39,6 +39,14 @@ export const PlacaSchema = z.object({
   enVivo: z.boolean(),
 });
 
+/**
+ * Lo que devuelve el modelo. `nombre` NO está acá: sale verbatim del mensaje de
+ * Slack, porque quién es "Evil Rabbit" en la placa lo decide el humano, no el
+ * LLM. Una superficie menos de alucinación. Ver docs/decisiones/003.
+ */
+export const CopySchema = InvitadoSchema.omit({ nombre: true });
+export type Copy = z.infer<typeof CopySchema>;
+
 export type Invitado = z.infer<typeof InvitadoSchema>;
 export type Foto = z.infer<typeof FotoSchema>;
 export type DatosPlaca = z.infer<typeof PlacaSchema>;
