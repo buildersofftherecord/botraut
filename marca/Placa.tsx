@@ -6,7 +6,7 @@ import { ImageResponse } from "@vercel/og";
 import sharp from "sharp";
 import { cargarFuentes } from "./fuentes/index";
 import { LIENZOS, type NombreLienzo } from "./lienzos";
-import { COLOR, FUENTE } from "./tokens";
+import { COLOR, NOMBRE_COLOR, FUENTE } from "./tokens";
 import { Esquinas, Etiqueta, PuntoRec } from "./Hud";
 import { IconoCalendario, IconoReloj, IconoSenal } from "./Iconos";
 import { etiquetaInvitado, type DatosPlaca } from "../lib/tipos";
@@ -45,7 +45,7 @@ const aca = dirname(fileURLToPath(import.meta.url));
  * lienzo sin su textura tiene que romper en desarrollo, no renderizar
  * estirado en producción.
  */
-const TEXTURAS: Record<NombreLienzo, string> = {
+export const TEXTURAS: Record<NombreLienzo, string> = {
   "1:1": "binario.png",
   "4:5": "binario-4x5.png",
   "9:16": "binario-9x16.png",
@@ -196,7 +196,7 @@ export async function renderizarConFactor(
               lineHeight: 0.92,
               letterSpacing: `${NOMBRE_LETTER_SPACING_EM}em`,
               textTransform: "uppercase",
-              color: COLOR.blanco,
+              color: NOMBRE_COLOR,
             }}
           >
             {datos.invitado.nombre}
@@ -245,6 +245,25 @@ export async function renderizarConFactor(
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Lema, centrado sobre el borde inferior, entre corchetes. Está en la
+            referencia y faltaba: es lo que cierra el marco por abajo, donde si
+            no queda un vacío que desbalancea el bloque de datos. */}
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: l.margen - 6 * s,
+            display: "flex",
+            justifyContent: "center",
+            gap: 14 * s,
+          }}
+        >
+          <Etiqueta color={COLOR.t55} escala={s}>[</Etiqueta>
+          <Etiqueta color={COLOR.t55} escala={s}>BUILDERS TALKING TO BUILDERS</Etiqueta>
+          <Etiqueta color={COLOR.t55} escala={s}>]</Etiqueta>
         </div>
 
         {/* El sticker: el wordmark con placa rotado -7°. Es una aplicación de

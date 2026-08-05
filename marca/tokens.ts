@@ -17,6 +17,18 @@ export const COLOR = {
   t35: "rgba(255,255,255,0.35)",
 } as const;
 
+/**
+ * El nombre **no va en blanco puro**. Medido sobre
+ * `referencia/placa-francisco-veiras.jpeg`, el interior de los trazos da
+ * p50=163, p75=168, p90=176 — un gris, no `#ffffff`. Nuestra primera versión
+ * daba 251 de media y por eso se veía dura contra el negro.
+ *
+ * Este valor sí se deriva de la imagen, a diferencia del resto de `COLOR`:
+ * es una decisión del diseño de la placa, no un token del sistema que
+ * compartimos con `landing/`.
+ */
+export const NOMBRE_COLOR = "#a5a5a5";
+
 /** De `.hud-corner` y `.hud-label`, más `--fs-hud` y `--tr-hud`. */
 export const HUD = {
   esquinaLado: 26,

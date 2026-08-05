@@ -12,9 +12,8 @@ function rng(semilla: number): () => number {
 /**
  * Columnas de ceros y unos, muy por debajo del contraste del texto: es
  * atmósfera, no información. Grilla rala (no una celda por línea), fuente
- * chica y techo de luz bajo (0x10 sobre negro) para que a simple vista se
- * lea como grano y no como dígitos: la primera pasada, con grilla densa y
- * fill hasta 0x26, se leía carácter por carácter y competía con el nombre.
+ * chica. El techo de luz sale medido de la referencia, no a ojo: ver el
+ * comentario sobre la curva sesgada abajo.
  * `probabilidad` deja celdas vacías: sin eso la grilla rala igual se ve
  * como una trama uniforme en vez de ruido disperso.
  */
@@ -24,20 +23,37 @@ export async function generarBinario(
   semilla: number,
 ): Promise<Buffer> {
   const azar = rng(semilla);
-  const pasoX = 32;
-  const pasoY = 28;
-  const probabilidad = 0.55;
+  const pasoX = 26;
+  const pasoY = 19;
   const filas: string[] = [];
 
+  // Columnas verticales, no una grilla pareja. En la referencia la textura cae
+  // como lluvia: tramos verticales continuos de dígitos, con huecos anchos
+  // entre columnas. Una grilla dispersa da una trama uniforme que se lee
+  // dígito por dígito y compite con el nombre.
   for (let x = 0; x < ancho; x += pasoX) {
-    for (let y = 0; y < alto; y += pasoY) {
-      if (azar() > probabilidad) continue;
-      const digito = azar() > 0.5 ? "1" : "0";
-      const luz = Math.floor(5 + azar() * 11);
-      const hex = luz.toString(16).padStart(2, "0");
-      filas.push(
-        `<text x="${x}" y="${y}" font-family="monospace" font-size="11" fill="#${hex}${hex}${hex}">${digito}</text>`,
-      );
+    if (azar() > 0.42) continue;
+
+    // El brillo es de la columna, no del dígito: dentro de un tramo comparten
+    // intensidad, y eso es lo que los hace leer como chorro y no como puntos
+    // sueltos. La curva sesgada deja pocas columnas visibles y muchas al ras
+    // del negro — la referencia mide mediana 1, p90 15, máximo 88.
+    const luzColumna = 4 + Math.pow(azar(), 2.2) * 80;
+
+    // Varios tramos por columna, de largo variable, separados por vacío.
+    let y = Math.floor(azar() * alto);
+    while (y < alto) {
+      const largo = 3 + Math.floor(azar() * 22);
+      for (let i = 0; i < largo && y < alto; i++, y += pasoY) {
+        const digito = azar() > 0.5 ? "1" : "0";
+        // Decae hacia el final del tramo, como la estela de la lluvia.
+        const luz = Math.max(2, Math.floor(luzColumna * (1 - (i / largo) * 0.65)));
+        const hex = luz.toString(16).padStart(2, "0");
+        filas.push(
+          `<text x="${x}" y="${y}" font-family="monospace" font-size="12" fill="#${hex}${hex}${hex}">${digito}</text>`,
+        );
+      }
+      y += pasoY * (2 + Math.floor(azar() * 8));
     }
   }
 
