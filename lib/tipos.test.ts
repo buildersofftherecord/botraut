@@ -43,6 +43,11 @@ describe("FotoSchema", () => {
   it("rechaza una foto que se va a pixelar", () => {
     expect(() => FotoSchema.parse({ ...fotoOk, ancho: 400 })).toThrow();
   });
+
+  it("acepta una foto sin fuente — la sube un humano, no un buscador", () => {
+    const { fuente, ...sinFuente } = fotoOk;
+    expect(() => FotoSchema.parse(sinFuente)).not.toThrow();
+  });
 });
 
 describe("PlacaSchema", () => {

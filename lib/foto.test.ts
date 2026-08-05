@@ -38,6 +38,17 @@ describe("validarFoto", () => {
     if (!r.ok) expect(r.motivo.toLowerCase()).toMatch(/apaisada|horizontal|medio cuerpo/);
   });
 
+  it("acepta exactamente en el límite de proporción", async () => {
+    // Mismo argumento que el mínimo de tamaño: el borde de aceptación importa
+    // tanto como el de rechazo. La regla es "como mucho 1.1" (comparación con
+    // `>`), así que 880×800 = 1.1 exacto tiene que entrar.
+    expect((await validarFoto(await imagen(880, 800))).ok).toBe(true);
+  });
+
+  it("rechaza apenas por encima del límite de proporción", async () => {
+    expect((await validarFoto(await imagen(881, 800))).ok).toBe(false);
+  });
+
   it("rechaza lo que no es una imagen sin explotar", async () => {
     const r = await validarFoto(Buffer.from("esto no es una imagen"));
     expect(r.ok).toBe(false);
