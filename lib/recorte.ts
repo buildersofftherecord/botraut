@@ -1,4 +1,5 @@
 import { removeBackground } from "@imgly/background-removal-node";
+import sharp from "sharp";
 
 /**
  * Implementación provisional: el spike local vs. pago (Task 13) nunca corrió
@@ -11,9 +12,18 @@ import { removeBackground } from "@imgly/background-removal-node";
  */
 export async function recortar(entrada: Buffer): Promise<Buffer> {
   try {
+    // La librería lee `blob.type` directamente, sin detectar el formato por
+    // magic bytes — un Blob sin `type` tira "Unsupported format: " aunque
+    // los bytes sean un JPEG válido. `descargar()` no conserva el
+    // content-type de la respuesta HTTP, así que se detecta acá con sharp
+    // en vez de confiar en el header (que además puede faltar o mentir).
+    const { format } = await sharp(entrada).metadata();
+
     // `Buffer` sin genérico admite `SharedArrayBuffer`, que `BlobPart` no
     // acepta — de ahí la copia a un `Uint8Array` concreto.
-    const salida = await removeBackground(new Blob([new Uint8Array(entrada)]));
+    const salida = await removeBackground(
+      new Blob([new Uint8Array(entrada)], { type: `image/${format}` }),
+    );
     return Buffer.from(await salida.arrayBuffer());
   } catch (e) {
     // `recortar` corre dentro del handler de Slack: si tira, la persona que
