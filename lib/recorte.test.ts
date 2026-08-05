@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import sharp from "sharp";
 
 const removeBackground = vi.hoisted(() => vi.fn());
@@ -35,6 +35,17 @@ async function unaFoto(): Promise<Buffer> {
 }
 
 describe("recortar", () => {
+  // Sin esto, la configuración de `removeBackground` de un test (p. ej.
+  // `mockRejectedValue`) sobrevive al siguiente porque es el mismo `vi.fn()`
+  // a nivel de archivo. No causaba un falso positivo hoy (el test de más
+  // abajo rechaza antes, en `sharp().metadata()`, sin llegar a llamar a
+  // `removeBackground` — confirmado contando `.mock.calls`), pero dejarlo
+  // implícito es la clase de fragilidad que ya nos mordió una vez en este
+  // módulo.
+  beforeEach(() => {
+    removeBackground.mockReset();
+  });
+
   it("le informa el formato real de la imagen a la librería", async () => {
     // La librería lee `blob.type` sin ningún sniffing de magic bytes propio
     // (confirmado leyendo su fuente compilada): un Blob sin `type` la hace
@@ -89,5 +100,38 @@ describe("recortar", () => {
     await expect(recortar(Buffer.from("no es una imagen"))).rejects.toThrow(
       /No pude recortar el fondo/,
     );
+    // Fija que el rechazo viene de `sharp().metadata()`, no de una llamada
+    // a la librería mockeada que por casualidad haya quedado configurada
+    // (o sin configurar) por otro test. Sin esta línea, el nombre del test
+    // promete un camino que la aserción de arriba no distingue de ningún
+    // otro.
+    expect(removeBackground).not.toHaveBeenCalled();
+  });
+
+  it("envuelve con el mismo mensaje humano un formato que sharp reconoce pero @imgly no soporta", async () => {
+    // TIFF: sharp lo lee sin problema, pero `imageDecode` de
+    // @imgly/background-removal-node (dist/index.mjs, leído para el fix de
+    // 96bd0fb) solo entiende image/png, image/jpeg, image/webp,
+    // application/octet-stream y sus dos formatos raw propios (x-alpha8,
+    // x-rgba8) — cualquier otro mime type, aunque sea sintácticamente
+    // válido, cae en su `default: throw new Error("Unsupported format: " +
+    // mime.type)`. El mock reproduce ese mismo criterio (no un
+    // `mockRejectedValue` fijo) para que el test dependa de qué tipo le
+    // llega, igual que la librería real.
+    removeBackground.mockImplementation(async (blob: Blob) => {
+      if (!["image/jpeg", "image/png", "image/webp"].includes(blob.type)) {
+        throw new Error(`Unsupported format: ${blob.type}`);
+      }
+      return new Blob([]);
+    });
+
+    const tiff = await sharp({
+      create: { width: 10, height: 10, channels: 3, background: { r: 1, g: 2, b: 3 } },
+    })
+      .tiff()
+      .toBuffer();
+
+    await expect(recortar(tiff)).rejects.toThrow(/No pude recortar el fondo/);
+    await expect(recortar(tiff)).rejects.not.toThrow(/Unsupported format/);
   });
 });
