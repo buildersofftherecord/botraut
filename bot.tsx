@@ -1,10 +1,6 @@
 import { Chat, Card, CardText, Actions, Button, type Thread, type Attachment } from "chat";
 import { createSlackAdapter } from "@chat-adapter/slack";
-import { createMemoryState } from "@chat-adapter/state-memory";
-// TODO(deploy): en serverless cada mensaje cae en una función que arranca sin
-// memoria — ahí hace falta `createRedisState()` de "@chat-adapter/state-redis"
-// (ya instalado, REDIS_URL ya configurada). `state-memory` alcanza en local
-// porque `next dev` es un proceso vivo.
+import { createRedisState } from "@chat-adapter/state-redis";
 import { buscarCopy, rehacerCopy } from "./lib/buscar";
 import { validarFoto } from "./lib/foto";
 import { InvitadoSchema, FotoSchema, type Copy } from "./lib/tipos";
@@ -25,7 +21,10 @@ import {
 export const bot = new Chat({
   userName: "botraut",
   adapters: { slack: createSlackAdapter() },
-  state: createMemoryState(),
+  // Redis y no memoria: en serverless cada mensaje de Slack cae en una función
+  // que arranca en blanco, así que el estado que escribe el turno 1 tiene que
+  // sobrevivir afuera del proceso para que el turno 2 lo lea.
+  state: createRedisState(),
 });
 
 /**
