@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
 import sharp from "sharp";
-import { renderizar, renderizarConFactor, DATOS_DEMO } from "./Placa";
+import { renderizar, renderizarConFactor } from "./Placa";
 import { tamanoNombre } from "./medirNombre";
 import { pixelEn, medidas, regionTieneClaros } from "../test/pixel";
 import { etiquetaInvitado } from "../lib/tipos";
+import { DATOS_DEMO } from "../lib/demo";
 import { LIENZOS } from "./lienzos";
 
 describe("renderizar", () => {

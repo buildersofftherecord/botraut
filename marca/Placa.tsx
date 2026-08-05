@@ -52,24 +52,6 @@ const TEXTURAS: Record<NombreLienzo, string> = {
   "16:9": "binario-16x9.png",
 };
 
-export const DATOS_DEMO: DatosPlaca = {
-  invitado: {
-    nombre: "Naomi Couriel",
-    rol: "AI Engineering en UdeSA y Data & AI en Ualá",
-    genero: "f",
-    fuentes: ["https://ejemplo.com/naomi"],
-  },
-  fotoElegida: {
-    url: "https://ejemplo.com/foto.jpg",
-    fuente: "https://ejemplo.com/nota",
-    ancho: 1200,
-    alto: 1600,
-  },
-  fecha: "JUEVES 30 DE JULIO",
-  hora: "21:00 HS",
-  enVivo: true,
-};
-
 /**
  * Cuerpo real de `renderizar`, parametrizado por el factor de supersampling.
  * Separado así para que `Placa.test.tsx` pueda comparar factor 1 contra

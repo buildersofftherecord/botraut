@@ -1,5 +1,6 @@
 import { writeFile, mkdir } from "node:fs/promises";
-import { renderizar, DATOS_DEMO } from "../marca/Placa";
+import { renderizar } from "../marca/Placa";
+import { DATOS_DEMO } from "../lib/demo";
 import type { NombreLienzo } from "../marca/lienzos";
 
 const lienzo = (process.argv[2] ?? "1:1") as NombreLienzo;
