@@ -64,7 +64,7 @@ describe("descargar", () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       status: 200,
-      headers: new Headers({ "content-length": "4" }),
+      headers: new Headers({ "content-length": "4", "content-type": "image/jpeg" }),
       arrayBuffer: async () => cuerpo,
     } as Response);
 
@@ -86,7 +86,7 @@ describe("descargar", () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       status: 200,
-      headers: new Headers({ "content-length": "20000000" }),
+      headers: new Headers({ "content-length": "20000000", "content-type": "image/jpeg" }),
       arrayBuffer: async () => new ArrayBuffer(0),
     } as Response);
 
@@ -97,7 +97,7 @@ describe("descargar", () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       status: 200,
-      headers: new Headers(), // sin content-length: el chequeo previo no alcanza
+      headers: new Headers({ "content-type": "image/jpeg" }), // sin content-length: el chequeo previo no alcanza
       arrayBuffer: async () => new ArrayBuffer(15_000_001),
     } as Response);
 
@@ -108,11 +108,59 @@ describe("descargar", () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       status: 200,
-      headers: new Headers({ "content-length": "4" }),
+      headers: new Headers({ "content-length": "4", "content-type": "image/jpeg" }),
       arrayBuffer: async () => new Uint8Array([9, 9, 9, 9]).buffer,
     } as Response);
 
     await descargar("https://ejemplo.com/foto.jpg");
     expect(fetch).toHaveBeenCalledWith("https://ejemplo.com/foto.jpg");
+  });
+
+  // El caso que motiva esta task: Slack no devuelve 401 cuando falta el auth
+  // header, devuelve 200 con el HTML de la página de login. Sin este chequeo,
+  // ese HTML se cuela como si fueran los bytes de la foto y el error
+  // reventaría recién adentro de `sharp`, lejos de la causa real.
+  it("rechaza una respuesta 200 que no es una imagen (HTML de login, sin auth)", async () => {
+    const html = new TextEncoder().encode("<html><body>Sign in to Slack</body></html>").buffer;
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-type": "text/html; charset=utf-8" }),
+      arrayBuffer: async () => html,
+    } as Response);
+
+    await expect(descargar("https://files.slack.com/foto-privada.jpg")).rejects.toThrow(
+      /no es una imagen|autenticaci/i,
+    );
+  });
+
+  it("con el header, baja los bytes de una URL privada de Slack", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-length": "4", "content-type": "image/png" }),
+      arrayBuffer: async () => new Uint8Array([5, 6, 7, 8]).buffer,
+    } as Response);
+
+    const bytes = await descargar("https://files.slack.com/foto-privada.jpg", {
+      Authorization: "Bearer xoxb-test",
+    });
+
+    expect(Buffer.from(bytes)).toEqual(Buffer.from([5, 6, 7, 8]));
+    expect(fetch).toHaveBeenCalledWith("https://files.slack.com/foto-privada.jpg", {
+      headers: { Authorization: "Bearer xoxb-test" },
+    });
+  });
+
+  it("sin headers no le manda un segundo argumento a fetch", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "content-length": "4", "content-type": "image/png" }),
+      arrayBuffer: async () => new Uint8Array([1, 1, 1, 1]).buffer,
+    } as Response);
+
+    await descargar("https://ejemplo.com/foto.jpg");
+    expect(vi.mocked(fetch).mock.calls[0]).toHaveLength(1);
   });
 });

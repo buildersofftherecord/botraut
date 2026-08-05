@@ -3,9 +3,25 @@ import sharp from "sharp";
 /** 15 MB: una foto de prensa razonable nunca los pasa. */
 const MAXIMO_BYTES = 15_000_000;
 
-export async function descargar(url: string): Promise<Buffer> {
-  const r = await fetch(url);
+/**
+ * `headers` existe por las URLs de archivo de Slack: son privadas, y sin
+ * `Authorization: Bearer $SLACK_BOT_TOKEN` Slack responde **200 con el HTML
+ * de la página de login**, no un 401. Sin el chequeo de `content-type` de
+ * abajo, esa respuesta pasaría como si fueran los bytes de la foto y el
+ * error recién aparecería tres pasos después, adentro de `sharp`, con un
+ * mensaje que no señala la causa real.
+ */
+export async function descargar(url: string, headers?: HeadersInit): Promise<Buffer> {
+  const r = headers ? await fetch(url, { headers }) : await fetch(url);
   if (!r.ok) throw new Error(`descarga: HTTP ${r.status} en ${url}`);
+
+  const tipo = r.headers.get("content-type") ?? "";
+  if (!tipo.startsWith("image/")) {
+    throw new Error(
+      `descarga: la respuesta de ${url} no es una imagen (content-type "${tipo || "vacío"}") — ` +
+        `probablemente falta o venció la autenticación`,
+    );
+  }
 
   // Corta antes de bajar el cuerpo si el header lo declara — pero el header
   // es opcional (chunked, algunos CDNs), así que un cuerpo gigante sin
