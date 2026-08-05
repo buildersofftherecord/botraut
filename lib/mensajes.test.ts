@@ -1,10 +1,13 @@
 import { describe, it, expect } from "vitest";
 import type { Attachment } from "chat";
-import { InvitadoSchema, type Copy } from "./tipos";
+import { InvitadoSchema, PlacaSchema, type Copy } from "./tipos";
 import { PEDIDO_DE_FOTO } from "./foto";
 import {
   NO_ENCONTRADO,
   ID_BOTON_FECHA,
+  TEXTO_BOTON_FECHA,
+  CALLBACK_ID_MODAL_FECHA,
+  TITULO_MODAL_FECHA,
   mensajeNombreLargo,
   mensajeNoEncontrado,
   mensajeCopy,
@@ -13,7 +16,14 @@ import {
   listoParaFecha,
   mensajeFotoSinCopy,
   NO_ENTENDI,
+  mensajeGenerando,
+  mensajePlacaLista,
+  mensajeSinFotoParaPlaca,
+  mensajeErrorPlaca,
+  nombreArchivoPlaca,
+  erroresModalFecha,
 } from "./mensajes";
+import { DATOS_DEMO } from "./demo";
 
 describe("mensajeNombreLargo", () => {
   it("incluye el largo real y el máximo real del schema", () => {
@@ -189,5 +199,101 @@ describe("mensajeFotoSinCopy", () => {
 describe("NO_ENTENDI", () => {
   it("dice qué mandar en vez de solo avisar que falló", () => {
     expect(NO_ENTENDI).toMatch(/JPG|PNG/);
+  });
+});
+
+describe("CALLBACK_ID_MODAL_FECHA / TITULO_MODAL_FECHA", () => {
+  it("el título entra en el límite de 24 caracteres de un modal de Slack", () => {
+    expect(TITULO_MODAL_FECHA.length).toBeLessThanOrEqual(24);
+  });
+
+  it("el callback id del modal no es igual al id del botón (son cosas distintas)", () => {
+    expect(CALLBACK_ID_MODAL_FECHA).not.toBe(ID_BOTON_FECHA);
+  });
+});
+
+describe("mensajeGenerando", () => {
+  it("nombra a la persona y avisa que puede tardar", () => {
+    const mensaje = mensajeGenerando("Naomi Couriel");
+    expect(mensaje).toContain("Naomi Couriel");
+    expect(mensaje).toMatch(/tardar|segundos/);
+  });
+});
+
+describe("mensajePlacaLista", () => {
+  it("nombra a la persona", () => {
+    expect(mensajePlacaLista("Naomi Couriel")).toContain("Naomi Couriel");
+  });
+});
+
+describe("mensajeSinFotoParaPlaca", () => {
+  it("nombra a la persona y menciona el botón para volver a intentar", () => {
+    const mensaje = mensajeSinFotoParaPlaca("Naomi Couriel");
+    expect(mensaje).toContain("Naomi Couriel");
+    expect(mensaje).toContain(TEXTO_BOTON_FECHA);
+  });
+});
+
+describe("mensajeErrorPlaca", () => {
+  it("traduce un error de descarga (prefijo 'descarga:') a texto sin HTTP ni URLs", () => {
+    const crudo = new Error("descarga: HTTP 404 en https://files.slack.com/foto.jpg");
+    const mensaje = mensajeErrorPlaca("Naomi Couriel", crudo);
+
+    expect(mensaje).toContain("Naomi Couriel");
+    // La causa técnica no tiene que llegar al canal tal cual.
+    expect(mensaje).not.toContain("HTTP 404");
+    expect(mensaje).not.toContain("https://files.slack.com/foto.jpg");
+  });
+
+  it("un mensaje humano de recortar()/recortarASilueta() se publica tal cual, sin prefijo 'descarga:'", () => {
+    const humano = new Error(
+      "No pude recortar el fondo de esa foto. Probá con otra, preferentemente con el fondo más despejado.",
+    );
+    expect(mensajeErrorPlaca("Naomi Couriel", humano)).toBe(humano.message);
+  });
+
+  it("un error sin mensaje (no es Error) cae en un texto genérico, no revienta", () => {
+    const mensaje = mensajeErrorPlaca("Naomi Couriel", "algo no-Error");
+    expect(mensaje).toContain("Naomi Couriel");
+    expect(mensaje.length).toBeGreaterThan(0);
+  });
+});
+
+describe("nombreArchivoPlaca", () => {
+  // Valor fijo, no derivado de la función que se está probando: mutar el
+  // slugificado tiene que romper esto.
+  it("arma un slug ascii en minúsculas, sin acentos ni espacios", () => {
+    expect(nombreArchivoPlaca("Naomi Couriel")).toBe("placa-naomi-couriel.png");
+  });
+
+  it("saca los acentos", () => {
+    expect(nombreArchivoPlaca("Ñawi Núñez")).toBe("placa-nawi-nunez.png");
+  });
+
+  it("siempre termina en .png", () => {
+    expect(nombreArchivoPlaca("Naomi Couriel")).toMatch(/\.png$/);
+  });
+});
+
+describe("erroresModalFecha", () => {
+  it("mapea fecha y hora vacíos a un error por campo", () => {
+    const resultado = PlacaSchema.safeParse({ ...DATOS_DEMO, fecha: "", hora: "" });
+    if (resultado.success) throw new Error("fixture inválido: se esperaba que fallara");
+
+    const errores = erroresModalFecha(resultado.error);
+    expect(errores).toHaveProperty("fecha");
+    expect(errores).toHaveProperty("hora");
+  });
+
+  it("no inventa un error de fecha/hora si esos campos son válidos", () => {
+    // Fuerza una falla en un campo que no es del modal (fotoElegida.url mal
+    // formada) para confirmar que fecha/hora no aparecen sin motivo.
+    const resultado = PlacaSchema.safeParse({
+      ...DATOS_DEMO,
+      fotoElegida: { ...DATOS_DEMO.fotoElegida, url: "no-es-una-url" },
+    });
+    if (resultado.success) throw new Error("fixture inválido: se esperaba que fallara");
+
+    expect(erroresModalFecha(resultado.error)).toEqual({});
   });
 });

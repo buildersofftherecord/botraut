@@ -139,3 +139,98 @@ export function mensajeFotoSinCopy(nombre: string): string {
  */
 export const NO_ENTENDI =
   "No pude usar eso. Mandame una foto como JPG o PNG, o escribime el dato que falta.";
+
+/**
+ * Id del modal de fecha/hora (Task 23) y título de su cabecera. Slack corta
+ * el título de un modal a 24 caracteres — este entra con margen, y no lleva
+ * el nombre del invitado adentro por eso (un nombre de hasta 24 caracteres
+ * por sí solo ya rompería el límite).
+ */
+export const CALLBACK_ID_MODAL_FECHA = "fecha-y-hora";
+export const TITULO_MODAL_FECHA = "Fecha y hora";
+
+/**
+ * Se publica antes de arrancar el render (~15s: bajar, recortar fondo con un
+ * modelo de 155MB, silueta, B/N, resize, Satori a 2x y bajar). Mismo criterio
+ * que "Buscando a X..." del turno 1 y "Mirando la foto..." del turno 2: el
+ * silencio es el peor modo de falla de este bot.
+ */
+export function mensajeGenerando(nombre: string): string {
+  return `Generando la placa de *${nombre}*... puede tardar unos 15 segundos.`;
+}
+
+/** Acompaña al PNG cuando se sube al thread. */
+export function mensajePlacaLista(nombre: string): string {
+  return `Placa de *${nombre}* lista.`;
+}
+
+/**
+ * El botón de fecha solo debería aparecer después de que la foto ya validó
+ * (ver `postarBotonFecha` en `bot.tsx`), así que esto no debería pasar en el
+ * camino normal — pero un TTL vencido a mitad de camino, o un botón viejo en
+ * un thread reabierto, sí lo permiten. Mismo criterio que `SIN_ESTADO`:
+ * contestar algo accionable en vez de una excepción.
+ */
+export function mensajeSinFotoParaPlaca(nombre: string): string {
+  return (
+    `Todavía no tengo una foto guardada para *${nombre}* — ` +
+    `mandámela y volvé a tocar "${TEXTO_BOTON_FECHA}".`
+  );
+}
+
+/**
+ * Traduce lo que puede tirar `generarPlaca` (`lib/generar.ts`). `recortar()`
+ * y `recortarASilueta()` ya devuelven mensajes humanos (mismo estándar que
+ * `validarFoto`, ver `lib/foto.ts`) y se publican tal cual. `descargar()` es
+ * la excepción real: sus errores tienen el prefijo `"descarga:"` y texto
+ * técnico (HTTP, bytes, content-type) que nunca debería llegar al canal así
+ * como está — se traduce acá antes de publicarse.
+ */
+export function mensajeErrorPlaca(nombre: string, error: unknown): string {
+  const mensaje = error instanceof Error ? error.message : undefined;
+  if (!mensaje) return `No pude generar la placa de *${nombre}*. Probá de nuevo en un rato.`;
+
+  if (mensaje.startsWith("descarga:")) {
+    return (
+      `No pude bajar la foto de *${nombre}* desde Slack. ` +
+      `Probá subiéndola de nuevo y volvé a tocar "${TEXTO_BOTON_FECHA}".`
+    );
+  }
+
+  return mensaje;
+}
+
+/**
+ * El nombre del archivo que se sube al thread. Sale del nombre del invitado
+ * (no de `estado.copy`, que puede no tener nada distintivo) para que sea
+ * reconocible sin abrir el archivo.
+ */
+export function nombreArchivoPlaca(nombre: string): string {
+  const slug = nombre
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // saca acentos (rango Unicode de marcas combinantes): más portable entre clientes
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `placa-${slug || "invitado"}.png`;
+}
+
+/**
+ * Si `PlacaSchema.safeParse` falla sobre los valores del modal (en la
+ * práctica, `fecha`/`hora` vacíos después de recortar espacios — Slack ya
+ * exige que los campos no vengan vacíos, pero no filtra "solo espacios"),
+ * esto arma los errores por campo que espera `{ action: "errors" }` de
+ * `onModalSubmit`. Los otros campos de `PlacaSchema` (`invitado`,
+ * `fotoElegida`) salen del estado, ya validado al guardarse — si fallan acá
+ * el problema no es de este formulario, así que no se les inventa un error.
+ */
+export function erroresModalFecha(error: z.ZodError): Record<string, string> {
+  const errores: Record<string, string> = {};
+  for (const issue of error.issues) {
+    const campo = issue.path[0];
+    if (campo === "fecha" || campo === "hora") {
+      errores[campo] = "Escribí algo acá — no puede quedar vacío.";
+    }
+  }
+  return errores;
+}
