@@ -30,6 +30,19 @@ const SUPERMUESTREO = 2;
 const aca = dirname(fileURLToPath(import.meta.url));
 
 /**
+ * Una textura por lienzo, no una estirada: un PNG cuadrado escalado a
+ * 1080×1350 deforma los dígitos un 25% en vertical. Las cinco placas reales
+ * tienen texturas distintas entre sí (correlación 0.06-0.15), así que no hay
+ * una imagen base única — lo que se copia es el carácter, no el archivo.
+ */
+export const TEXTURAS: Record<NombreLienzo, string> = {
+  "1:1": "binario.png",
+  "4:5": "binario-4x5.png",
+  "9:16": "binario-9x16.png",
+  "16:9": "binario-16x9.png",
+};
+
+/**
  * Cuerpo real de `renderizar`, parametrizado por el factor de supersampling.
  * Separado así para que `Placa.test.tsx` pueda comparar factor 1 contra
  * factor 2 sobre el mismo recorte de píxeles — la única forma honesta de
@@ -63,6 +76,7 @@ export async function renderizarConFactor(
 
   const anchoColumna = l.ancho * (1 - l.fotoAncho) - l.margen - 40 * s;
   const sticker = await readFile(join(aca, "svg", "botr-sticker.svg"));
+  const binario = await readFile(join(aca, "texturas", TEXTURAS[nombreLienzo]));
   const [fuentes, tamanoDelNombre] = await Promise.all([
     cargarFuentes(),
     tamanoNombre(datos.invitado.nombre, anchoColumna, l.nombreTamano),
@@ -80,6 +94,13 @@ export async function renderizarConFactor(
           fontFamily: FUENTE.mono,
         }}
       >
+        {/* Textura de binario: atmósfera de fondo, no información. Va
+            primera en el árbol para que todo lo demás pinte encima. */}
+        <img
+          src={`data:image/png;base64,${binario.toString("base64")}`}
+          style={{ position: "absolute", top: 0, left: 0, width: l.ancho, height: l.alto }}
+        />
+
         {/* La foto: a sangre derecha, cortada abajo. Llega ya recortada y en
             B/N desde lib/procesar.ts — Satori no soporta filter. Va primera
             en el árbol para que el marco HUD y la tipografía pinten encima. */}
