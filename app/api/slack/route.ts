@@ -15,5 +15,9 @@ export async function POST(request: Request) {
   });
 }
 
-/** buscarCopy contra Gemini tarda ~5s; el default de Vercel no alcanza. */
-export const maxDuration = 60;
+/**
+ * El camino largo es historial de Slack + varias vueltas del agente + recorte
+ * de fondo + render. Con 60s la función moría a mitad de camino y Vercel la
+ * mataba con SIGTERM, sin dejar nada publicado en el thread.
+ */
+export const maxDuration = 300;

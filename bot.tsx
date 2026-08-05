@@ -19,8 +19,15 @@ export const bot = new Chat({
   // tira "No Chat singleton registered" al tocar `thread.state`.
 }).registerSingleton();
 
-/** Cuántos mensajes del thread se le pasan al agente como contexto. */
-const MENSAJES_DE_CONTEXTO = 30;
+/**
+ * Cuántos mensajes del thread se le pasan al agente como contexto.
+ *
+ * Bajo a propósito: `thread.messages` pagina contra la API de Slack y busca
+ * info de cada autor, así que cada mensaje extra es latencia real. Con 30 la
+ * función se pasaba del tiempo y Vercel la mataba con SIGTERM. Una placa se
+ * arma en pocos mensajes; no hace falta más memoria que eso.
+ */
+const MENSAJES_DE_CONTEXTO = 12;
 
 /**
  * Turno 1: alguien tira un nombre en el canal. `onNewMessage` solo dispara en
