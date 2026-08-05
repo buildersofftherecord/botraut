@@ -49,7 +49,31 @@ Estado de la infra:
 
 ---
 
-## 3. Redis — pendiente concreto
+## 3. Redis — ✅ RESUELTO el 2026-08-05
+
+Anda en producción: `model-phoenix-145112.upstash.io`, creada **directo en
+`console.upstash.com`** con el mail de BOTR, región `us-east-1` para acomodarse a
+`iad1` de Vercel. `REDIS_URL` cargada a mano en Vercel, los tres entornos.
+Verificado con PING, SET/GET, TTL y DEL desde local, y desde producción con una
+ruta de diagnóstico temporal que ya se borró.
+
+**La lección, por si vuelve a aparecer:** el Marketplace de Vercel creaba las
+bases con el usuario Redis deshabilitado. Dos bases distintas, dos protocolos,
+desde afuera y desde adentro de Vercel: siempre `WRONGPASS ... user is disabled`.
+**No usar el Marketplace para Upstash.** Crear directo y cargar `REDIS_URL` a
+mano.
+
+Otra cosa que costó tiempo: **cambiar una variable de entorno en Vercel no
+redeploya**. El valor se congela en el build, así que hay que hacer Redeploy para
+que tome.
+
+Falta un solo paso, cuando el bot esté armado:
+
+- [ ] En `bot.ts`, cambiar `createMemoryState()` por `createRedisState()`. Es una
+      línea; la Task 21 lo dejó preparado así a propósito.
+
+<details>
+<summary>Diagnóstico viejo del Marketplace (archivado)</summary>
 
 El store de Upstash (`prompt-earwig-149142.upstash.io`) **rechaza su propia
 credencial**, incluso la que sale del environment de Vercel:
@@ -90,9 +114,9 @@ sirve** — un usuario deshabilitado falla con cualquier contraseña.
 - [ ] Pegarlo en `.env.local` **con comillas** y verificar con un ping
 - [ ] Para el deploy: cargar `REDIS_URL` **a mano** en Settings → Environment
       Variables de Vercel. No volver a usar el Marketplace para esto
-- [ ] Verificar desde producción abriendo `/api/redis-ping`. Cuando dé
-      `ok:true`, **borrar esa ruta** (`app/api/redis-ping/route.ts`) — es
-      diagnóstico temporal, no parte del producto
+- [x] Verificar desde producción — hecho, la ruta de diagnóstico ya se borró
+
+</details>
 
 ---
 
