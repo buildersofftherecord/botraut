@@ -16,7 +16,13 @@ export const InvitadoSchema = z.object({
   rol: z.string().min(1).max(70),
   /** El template dice INVITADA / INVITADO / INVITADX. Es un campo del diseño. */
   genero: z.enum(["f", "m", "x"]),
-  fuentes: z.array(z.string().url()).min(1),
+  /**
+   * De dónde salió el rol. Nadie lo lee todavía, y exigir al menos una URL
+   * obligaba al modelo a inventarlas: no tiene navegación, así que cualquier
+   * link que devuelva es fabricado. Vacío es la respuesta honesta cuando el
+   * dato salió de su memoria o lo escribió el humano.
+   */
+  fuentes: z.array(z.string().url()).default([]),
 });
 
 /**

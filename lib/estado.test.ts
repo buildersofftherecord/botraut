@@ -33,7 +33,10 @@ describe("EstadoThreadSchema", () => {
   // esto igual que los casos de arriba, porque ninguno manda un copy inválido
   // junto a un nombre válido. Este es el único que lo hace.
   it("rechaza un copy incompleto aunque el nombre sea válido", () => {
-    const copyIncompleto = { rol: "AI Engineering en UdeSA", genero: "f" }; // falta fuentes
+    // Falta `rol`, que es el único campo del copy sin default: `fuentes`
+    // ahora vale vacío a propósito, porque exigir una URL obligaba al modelo
+    // a inventarla.
+    const copyIncompleto = { genero: "f", fuentes: [] };
     expect(() =>
       EstadoThreadSchema.parse({ nombre: "Naomi Couriel", copy: copyIncompleto }),
     ).toThrow();
