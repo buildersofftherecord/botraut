@@ -56,7 +56,12 @@ export const bot = new Chat({
   // que arranca en blanco, así que el estado que escribe el turno 1 tiene que
   // sobrevivir afuera del proceso para que el turno 2 lo lea.
   state: createRedisState(),
-});
+  // Sin esto, el submit del modal tira "No Chat singleton registered": el
+  // `Thread` de una interacción se reconstruye desde el payload y resuelve su
+  // adaptador de estado por búsqueda perezosa contra el singleton. En los
+  // eventos de mensaje no hace falta porque el thread viene del propio flujo,
+  // así que el turno 3 fallaba mientras los turnos 1 y 2 andaban bien.
+}).registerSingleton();
 
 /**
  * Turno 1: alguien tira un nombre en el canal, sin mención de por medio.
