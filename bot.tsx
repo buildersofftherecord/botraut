@@ -33,6 +33,16 @@ bot.onNewMessage(/\S/, async (thread, message) => {
   await thread.subscribe();
 });
 
+/**
+ * Mencionarlo es el instinto natural de cualquiera, y sin este handler el
+ * evento llega, se procesa y no lo escucha nadie: el bot queda mudo sin que
+ * aparezca ningún error. Ya pasó una vez.
+ */
+bot.onNewMention(async (thread, message) => {
+  await atender(thread, message);
+  await thread.subscribe();
+});
+
 /** Todo lo que siga en el thread: la foto, correcciones, confirmaciones. */
 bot.onSubscribedMessage(atender);
 
