@@ -120,6 +120,66 @@ sirve** — un usuario deshabilitado falla con cualquier contraseña.
 
 ---
 
+## 3b. 🔴 EL RECORTE DE FONDO NO ANDA EN PRODUCCIÓN
+
+**Estado al 2026-08-05: el bot contesta, pero `@imgly` falla con fotos fáciles.**
+Gastón probó dos fotos sencillas de recortar y ninguna pasó. Es el problema más
+grande abierto, y el que más va a costar.
+
+### Lo que ya sabemos
+
+- **Tumbaba el bot entero.** `lib/recorte.ts` importaba `@imgly` en la primera
+  línea, así que se cargaba al arrancar la función de Slack aunque el mensaje no
+  trajera foto. Cuando esa carga falla, muere la función: `GET /api/slack`
+  devolvía **500 con cuerpo vacío** y el bot no contestaba nada.
+- **Arreglado a medias.** Dos cambios: `serverExternalPackages:
+  ["@imgly/background-removal-node"]` en `next.config.ts` (los binarios nativos y
+  las rutas del modelo se rompen al bundlear), e import dinámico adentro de
+  `recortar()`. Ahora la función carga y el fallo queda contenido en el camino
+  de la foto, con mensaje humano.
+- **Pero el recorte en sí sigue sin funcionar.**
+
+### La pista más fuerte
+
+De los ~50 archivos del modelo en `node_modules/@imgly/background-removal-node/dist`
+(127MB, nombrados por hash, sin extensión), **el trazado de Vercel incluyó uno
+solo**. Lo verifiqué así:
+
+```sh
+npx next build
+python3 -c "
+import json
+d=json.load(open('.next/server/app/api/slack/route.js.nft.json'))
+f=[x for x in d.get('files',[]) if 'imgly' in x]
+print(len(f))"
+```
+
+Si el modelo no viaja completo, no hay forma de que cargue en runtime.
+
+### Primer paso cuando se retome
+
+**Conseguir el mensaje exacto** que el bot publica al fallar. Distingue dos
+causas muy distintas:
+- *"No pude recortar el fondo de esa foto"* → el modelo no cargó o tiró
+- otra cosa → el recorte corrió pero produjo basura
+
+Segundo: los **Runtime Logs de Vercel** durante ese fallo. Nunca los pudimos
+leer (la cuenta es de BOTR y el CLI local no tiene sesión ahí), y todo el
+diagnóstico se hizo por deducción desde afuera.
+
+### Salidas posibles
+
+| Camino | Costo |
+|---|---|
+| `outputFileTracingIncludes` en `next.config.ts` para forzar los archivos del modelo | gratis, puede chocar con el límite de tamaño |
+| Servicio hosted (remove.bg, Replicate) | ~10 USD/año. **La firma `recortar(bytes) => Promise<Buffer>` no filtra nada de `@imgly`: es cambiar un archivo** |
+| Sacar el recorte del v1 y usar la foto con fondo | gratis, pero el template pide silueta |
+
+La Task 13 iba a decidir esto con un spike y nunca corrió por falta de fotos de
+prueba. La decisión se termina tomando acá, con evidencia de producción.
+
+---
+
 ## 4. Deuda técnica a resolver antes o durante el deploy
 
 - [ ] **`@imgly/background-removal-node` pesa 155MB** y arrastra tres copias de
