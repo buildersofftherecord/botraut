@@ -68,9 +68,19 @@ encoding: conectando con `username`/`password` explícitos, sin pasar por la URL
 falla idéntico. La contraseña son 62 caracteres limpios, sin `%`, `:` ni `@`.
 
 Dos bases independientes creadas por el mismo camino rechazan las dos su propia
-credencial. **El problema es el camino, no el recurso** — la integración
-Vercel↔Upstash provisiona en estado suspendido, o muestra credenciales que no
-corresponden a la base que creó.
+credencial. **El problema es el camino, no el recurso.**
+
+Se probó también **desde adentro de Vercel** (`/api/redis-ping`, ruta temporal
+que sigue en el repo): mismo `WRONGPASS`, mismo host. Eso descarta la última
+explicación benigna — que las credenciales fueran de vida corta o válidas solo en
+el runtime donde Vercel las inyecta. Vercel la inyectó en su propio runtime y
+Upstash la rechazó igual.
+
+Dato que aporta el diagnóstico: un token basura devuelve `"invalid or missing
+auth token"`, mientras que el nuestro devuelve `"invalid username-password pair
+or user is disabled"`. Son mensajes **distintos**, así que el token es correcto y
+rutea bien a la base; lo que está apagado es el usuario. **Rotar la contraseña no
+sirve** — un usuario deshabilitado falla con cualquier contraseña.
 
 - [ ] Crear cuenta en **console.upstash.com** con el mail de BOTR. Es la cuenta
       propia de Upstash, distinta de la que gestiona Vercel — por eso antes no
@@ -80,6 +90,9 @@ corresponden a la base que creó.
 - [ ] Pegarlo en `.env.local` **con comillas** y verificar con un ping
 - [ ] Para el deploy: cargar `REDIS_URL` **a mano** en Settings → Environment
       Variables de Vercel. No volver a usar el Marketplace para esto
+- [ ] Verificar desde producción abriendo `/api/redis-ping`. Cuando dé
+      `ok:true`, **borrar esa ruta** (`app/api/redis-ping/route.ts`) — es
+      diagnóstico temporal, no parte del producto
 
 ---
 
