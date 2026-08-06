@@ -81,7 +81,7 @@ describe("bloque de tipografía", () => {
 
     // Y que sea el gris medido en la referencia, no blanco puro. El interior
     // de los trazos da p50=163 / p90=176 en
-    // `referencia/placa-francisco-veiras.jpeg`; con #ffffff esto daba 251 de
+    // `referencia/francisco-veiras.jpeg`; con #ffffff esto daba 251 de
     // media y se veía duro contra el negro. El techo deja aire para el
     // antialiasing del supersampling sin admitir un blanco.
     const maximo = Math.max(...trazo);

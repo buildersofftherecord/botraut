@@ -19,7 +19,7 @@ export const COLOR = {
 
 /**
  * El nombre **no va en blanco puro**. Medido sobre
- * `referencia/placa-francisco-veiras.jpeg`, el interior de los trazos da
+ * `referencia/francisco-veiras.jpeg`, el interior de los trazos da
  * p50=163, p75=168, p90=176 — un gris, no `#ffffff`. Nuestra primera versión
  * daba 251 de media y por eso se veía dura contra el negro.
  *
