@@ -37,6 +37,16 @@ const nextConfig: NextConfig = {
       // Solo `linux`: es la plataforma donde corre la función, y traer darwin y
       // win32 sería cargar el despliegue con binarios que nunca se ejecutan.
       "./node_modules/onnxruntime-node/bin/napi-v3/linux/**/*",
+
+      // `placas/` lee su capa horneada, sus fuentes y los assets de marca con
+      // `readFile` en runtime, y el trazador sigue `import`, no rutas armadas
+      // con `join()`. Verificado tras un build: las dos .ttf se trazaban solas
+      // pero `fijo/1x1.png` no, así que el render habría fallado en Vercel con
+      // todo funcionando en local — el mismo modo de falla que el modelo de
+      // @imgly.
+      "./placas/fijo/**/*",
+      "./placas/fuentes/**/*",
+      "./placas/marca/**/*",
     ],
   },
 };

@@ -1,84 +1,100 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const orden: string[] = [];
+const descargar = vi.fn();
+const recortar = vi.fn();
+const armarPlaca = vi.fn();
 
-vi.mock("./procesar", () => ({
-  descargar: vi.fn(async () => {
-    orden.push("descargar");
-    return Buffer.from("a");
-  }),
-  aBlancoYNegro: vi.fn(async () => {
-    orden.push("byn");
-    return Buffer.from("b");
-  }),
-  ajustarAlto: vi.fn(async () => {
-    orden.push("resize");
-    return Buffer.from("c");
-  }),
-}));
-vi.mock("./recorte", () => ({
-  recortar: vi.fn(async () => {
-    orden.push("recortar");
-    return Buffer.from("d");
-  }),
-}));
-vi.mock("./silueta", () => ({
-  recortarASilueta: vi.fn(async () => {
-    orden.push("silueta");
-    return { png: Buffer.from("e"), ancho: 1, alto: 1 };
-  }),
-}));
-vi.mock("../marca/Placa", () => ({
-  renderizar: vi.fn(async () => {
-    orden.push("render");
-    return Buffer.from("png");
-  }),
-}));
+vi.mock("./procesar", () => ({ descargar }));
+vi.mock("./recorte", () => ({ recortar }));
+vi.mock("./placa", () => ({ armarPlaca }));
 
 const { generarPlaca } = await import("./generar");
-const { DATOS_DEMO } = await import("./demo");
 
-describe("generarPlaca", () => {
-  it("corre el pipeline en orden: recorta el fondo, después a silueta, después B/N, después el resize", async () => {
-    // Fija el orden completo del pipeline (Task 22b agrega "silueta" entre
-    // "recortar" y "byn"): tiene que seguir fallando si alguien mueve el
-    // recorte de fondo o el recorte a silueta después del blanco y negro.
-    orden.length = 0;
-    await generarPlaca(DATOS_DEMO);
-    expect(orden).toEqual(["descargar", "recortar", "silueta", "byn", "resize", "render"]);
+const URL_SLACK = "https://files.slack.com/files-pri/T0/F0/foto.png";
+const DATOS = {
+  invitado: { nombre: "Guillermo Rauch", rol: "CEO & Founder @Vercel", genero: "m" },
+  fecha: "JUEVES 20 DE AGOSTO",
+  hora: "21:00 HS",
+  enVivo: true,
+};
+
+const ORIGINAL = Buffer.from("jpeg-de-slack");
+const RECORTADA = Buffer.from("png-con-alfa");
+const PLACA = Buffer.from("placa-final");
+
+beforeEach(() => {
+  descargar.mockResolvedValue(ORIGINAL);
+  recortar.mockResolvedValue(RECORTADA);
+  armarPlaca.mockResolvedValue({ ok: true, png: PLACA });
+  delete process.env.SLACK_BOT_TOKEN;
+});
+
+describe("generarPlaca — el orden importa", () => {
+  /**
+   * `placas/` espera una foto ya recortada y **no verifica que lo esté**: con
+   * un JPEG crudo genera la placa igual, con el rectángulo visible alrededor
+   * de la persona. Si alguien mueve `recortar` después de `armarPlaca`, o lo
+   * saca, el sistema no se queja — sale una placa fea en silencio.
+   */
+  it("recorta el fondo antes de armar la placa", async () => {
+    await generarPlaca(DATOS, URL_SLACK);
+
+    expect(recortar).toHaveBeenCalledWith(ORIGINAL);
+    expect(armarPlaca).toHaveBeenCalledWith(DATOS, RECORTADA);
+    expect(recortar.mock.invocationCallOrder[0]).toBeLessThan(armarPlaca.mock.invocationCallOrder[0]);
   });
 
-  it("devuelve el PNG que produjo el render", async () => {
-    const { png } = await generarPlaca(DATOS_DEMO);
-    expect(png.toString()).toBe("png");
+  it("devuelve lo que armó placas/", async () => {
+    const r = await generarPlaca(DATOS, URL_SLACK);
+    expect(r).toEqual({ ok: true, png: PLACA });
+  });
+});
+
+describe("generarPlaca — autenticación de Slack", () => {
+  // Las URLs de archivo de Slack son privadas y no devuelven 401: sin el
+  // header, Slack responde 200 con el HTML de su página de login.
+  it("manda el bearer cuando hay token", async () => {
+    process.env.SLACK_BOT_TOKEN = "xoxb-falso";
+
+    await generarPlaca(DATOS, URL_SLACK);
+
+    expect(descargar).toHaveBeenCalledWith(URL_SLACK, { Authorization: "Bearer xoxb-falso" });
   });
 
-  // La URL de la foto es un archivo privado de Slack (ver procesar.ts):
-  // sin este header, `descargar` recibe el HTML de la página de login en
-  // vez de la foto.
-  it("le pasa el header de autenticación de Slack a descargar", async () => {
-    const original = process.env.SLACK_BOT_TOKEN;
-    process.env.SLACK_BOT_TOKEN = "xoxb-test-123";
-    try {
-      const { descargar } = await import("./procesar");
-      await generarPlaca(DATOS_DEMO);
-      expect(descargar).toHaveBeenCalledWith(DATOS_DEMO.fotoElegida.url, {
-        Authorization: "Bearer xoxb-test-123",
-      });
-    } finally {
-      process.env.SLACK_BOT_TOKEN = original;
-    }
+  it("sin token no inventa un header", async () => {
+    await generarPlaca(DATOS, URL_SLACK);
+    expect(descargar).toHaveBeenCalledWith(URL_SLACK, undefined);
+  });
+});
+
+describe("generarPlaca — errores hacia el humano", () => {
+  /**
+   * Lo que devuelve esta función lo repite el agente en el canal. `descargar`
+   * tira `descarga: HTTP 404 en <url>`, que filtra la URL del archivo privado
+   * de Slack.
+   */
+  it("no filtra el texto crudo ni la url si falla la descarga", async () => {
+    descargar.mockRejectedValue(new Error(`descarga: HTTP 404 en ${URL_SLACK}`));
+
+    const r = await generarPlaca(DATOS, URL_SLACK);
+
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.motivo).not.toMatch(/HTTP|descarga:|files\.slack\.com/);
+    expect(armarPlaca).not.toHaveBeenCalled();
   });
 
-  it("sin SLACK_BOT_TOKEN no manda un header inventado", async () => {
-    const original = process.env.SLACK_BOT_TOKEN;
-    delete process.env.SLACK_BOT_TOKEN;
-    try {
-      const { descargar } = await import("./procesar");
-      await generarPlaca(DATOS_DEMO);
-      expect(descargar).toHaveBeenCalledWith(DATOS_DEMO.fotoElegida.url, undefined);
-    } finally {
-      process.env.SLACK_BOT_TOKEN = original;
-    }
+  // `recortar` sí traduce sus errores, así que su mensaje se publica tal cual
+  // en vez de reemplazarlo por uno genérico que diría menos.
+  it("pasa el mensaje de recortar tal cual", async () => {
+    const humano = "No pude recortar el fondo de esa foto. Puede ser la imagen o un problema mío.";
+    recortar.mockRejectedValue(new Error(humano));
+
+    const r = await generarPlaca(DATOS, URL_SLACK);
+
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.motivo).toBe(humano);
+    expect(armarPlaca).not.toHaveBeenCalled();
   });
 });

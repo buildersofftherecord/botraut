@@ -19,3 +19,6 @@ next-env.d.ts
 # A diferencia de landing/, acá los .ttf SÍ se versionan: Satori los necesita
 # en runtime y un deploy sin fuente no renderiza.
 # Ver docs/superpowers/specs/2026-08-03-placas-design.md §4.
+
+# Salidas de placas/, que escribe sus pruebas manuales ahí.
+placas/salida/

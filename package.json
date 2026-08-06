@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
-    "placa": "tsx scripts/placa.tsx"
+    "placa": "tsx scripts/placa.tsx",
+    "test:placas": "cd placas && vitest run",
+    "test:todo": "npm test && npm run test:placas"
   },
   "type": "module",
   "dependencies": {

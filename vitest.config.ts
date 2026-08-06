@@ -21,6 +21,9 @@ export default defineConfig({
     // correcta, pero por casualidad.
     clearMocks: true,
     include: ["**/*.test.ts", "**/*.test.tsx"],
-    exclude: ["node_modules/**", ".next/**"],
+    // `placas/` es un paquete autocontenido con su propio vitest.config.ts y
+    // su propio runtime de JSX (react, no chat). Corriéndolo con esta config
+    // fallan sus 16 tests por el JSX. Se corre aparte: `npm run test:placas`.
+    exclude: ["node_modules/**", ".next/**", "placas/**"],
   },
 });

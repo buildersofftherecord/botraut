@@ -3,7 +3,7 @@ import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { buscarCopy } from "./buscar";
 import { generarPlaca } from "./generar";
-import { PlacaSchema, InvitadoSchema } from "./tipos";
+import { InvitadoSchema } from "./tipos";
 import { NO_ENCONTRADO } from "./mensajes";
 import { EstadoThreadSchema } from "./estado";
 
@@ -103,8 +103,7 @@ export function crearHerramientas(conv: Conversacion) {
         const estado = EstadoThreadSchema.safeParse(crudo);
         // Se distinguen los dos casos a propósito. Antes cualquier fallo de
         // parseo se traducía a "no hay foto", y eso mintió: la foto estaba
-        // guardada y lo que fallaba era el schema, que todavía exigía campos
-        // que el agente dejó de escribir.
+        // guardada y lo que fallaba era el schema.
         if (!estado.success) {
           console.error("estado del thread ilegible", estado.error, crudo);
           return { ok: false, motivo: "El estado de este thread quedó ilegible. Que suba la foto de nuevo." };
@@ -113,36 +112,22 @@ export function crearHerramientas(conv: Conversacion) {
           return { ok: false, motivo: "Todavía no hay una foto validada en este thread." };
         }
 
-        const placa = PlacaSchema.parse({
-          invitado: {
-            nombre: datos.nombre,
-            rol: datos.rol,
-            genero: datos.genero,
-            fuentes: [],
+        // La forma que espera `placas/`: fecha y hora ya formateadas y en
+        // mayúsculas, sin `fuentes` ni la foto adentro. El paquete valida y
+        // devuelve todos los problemas juntos en un mensaje legible.
+        const resultado = await generarPlaca(
+          {
+            invitado: { nombre: datos.nombre, rol: datos.rol, genero: datos.genero },
+            fecha: datos.fecha.toUpperCase(),
+            hora: datos.hora.toUpperCase(),
+            enVivo: datos.enVivo,
           },
-          fotoElegida: estado.data.foto,
-          fecha: datos.fecha,
-          hora: datos.hora,
-          enVivo: datos.enVivo,
-        });
+          estado.data.foto.url,
+        );
 
-        let png: Buffer;
-        try {
-          ({ png } = await generarPlaca(placa));
-        } catch (e) {
-          // Lo que devuelva esta herramienta lo va a repetir el agente al
-          // humano, así que acá se corta cualquier texto técnico. `descargar()`
-          // tira cosas como `descarga: HTTP 400 en <url>` — que además filtra
-          // la URL del archivo privado de Slack.
-          console.error(`generarPlaca falló para "${datos.nombre}"`, e);
-          return {
-            ok: false,
-            motivo:
-              "No se pudo armar la placa con esa foto. Pedile al humano que mande otra.",
-          };
-        }
+        if (!resultado.ok) return { ok: false, motivo: resultado.motivo };
 
-        await conv.publicarPlaca(datos.nombre, png);
+        await conv.publicarPlaca(datos.nombre, resultado.png);
         return { ok: true };
       },
     }),

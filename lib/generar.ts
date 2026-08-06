@@ -1,47 +1,56 @@
-import { descargar, aBlancoYNegro, ajustarAlto } from "./procesar";
+import { descargar } from "./procesar";
 import { recortar } from "./recorte";
-import { recortarASilueta } from "./silueta";
-import { renderizar } from "../marca/Placa";
-import { LIENZOS, altoDeFoto } from "../marca/lienzos";
-import type { DatosPlaca } from "./tipos";
+import { armarPlaca, type ResultadoPlaca } from "./placa";
 
 /**
- * El orden importa: recortar primero, porque el modelo de segmentación usa
- * el color para separar figura de fondo y sobre una imagen ya en gris pierde
- * señal. El recorte a silueta (Task 22b) va inmediatamente después, todavía
- * con el alpha intacto: es el bbox de la persona el que define cuánto vale
- * la pena procesar, así que el B/N y el resize corren sobre ese recorte más
- * chico en vez de sobre los márgenes vacíos que `recortarASilueta` descarta.
- * El resize va último para no gastar cómputo en píxeles que se tiran.
+ * El puente entre Slack y `placas/`.
  *
- * `almacenar.ts` (Task 19, Vercel Blob) todavía no existe y su credencial no
- * está configurada — ver docs/decisiones o el brief de esta task. Esta
- * versión no persiste nada: devuelve solo el PNG. El guardado de las tres
- * etapas (original / recortada / placa) que describe el brief queda para
- * cuando Task 19 exista; el punto de enganche es este mismo `await` a
- * `renderizar`, no hace falta tocar el orden del pipeline para agregarlo.
+ * `placas/` recibe una foto **ya recortada** y no verifica que lo esté — con un
+ * JPEG crudo genera la placa igual, con el rectángulo visible. El recorte es
+ * responsabilidad de quien llama, y acá es donde vive: la foto llega de Slack
+ * como el humano la subió.
+ *
+ * Todo lo demás que antes hacía este archivo —pasar a B/N, ajustar el alto,
+ * recortar al sujeto— ahora lo hace `prepararRetrato` adentro de `placas/`,
+ * junto con la curva de negros y el desvanecido del borde. Eso es diseño y
+ * pertenece al paquete del diseño.
  */
+
 /**
- * `datos.fotoElegida.url` es una URL de archivo de Slack: privada, y sin
- * este header Slack devuelve el HTML de su página de login en vez de la foto
- * (ver `descargar()` en `procesar.ts`). Sin `SLACK_BOT_TOKEN` configurado,
- * esto devuelve `undefined` a propósito — mejor que `descargar` reciba nada
- * y falle por el chequeo de content-type (mensaje claro) a que mande un
- * header literal `"Bearer undefined"`.
+ * Las URLs de archivo de Slack son privadas: sin el header, Slack devuelve 200
+ * con el HTML de su página de login en vez de un 401.
  */
 function autorizacionSlack(): HeadersInit | undefined {
   const token = process.env.SLACK_BOT_TOKEN;
   return token ? { Authorization: `Bearer ${token}` } : undefined;
 }
 
-export async function generarPlaca(datos: DatosPlaca): Promise<{ png: Buffer }> {
-  const original = await descargar(datos.fotoElegida.url, autorizacionSlack());
-  const recortada = await recortar(original);
-  const silueta = await recortarASilueta(recortada);
-  const gris = await aBlancoYNegro(silueta.png);
-  const foto = await ajustarAlto(gris, altoDeFoto(LIENZOS["4:5"]));
+const NO_SE_PUDO_BAJAR =
+  "No pude bajar la foto de Slack. Probá subirla de nuevo.";
 
-  const png = await renderizar(datos, "4:5", foto);
+/**
+ * Nunca tira: devuelve el motivo como texto publicable. Lo que sale de acá lo
+ * repite el agente en el canal.
+ */
+export async function generarPlaca(datos: unknown, urlFoto: string): Promise<ResultadoPlaca> {
+  let original: Buffer;
+  try {
+    original = await descargar(urlFoto, autorizacionSlack());
+  } catch (e) {
+    // `descargar` no traduce sus errores: salen como `descarga: HTTP 404 en
+    // <url>`, que además filtra la URL del archivo privado.
+    console.error("no se pudo bajar la foto de Slack", e);
+    return { ok: false, motivo: NO_SE_PUDO_BAJAR };
+  }
 
-  return { png };
+  let recortada: Buffer;
+  try {
+    recortada = await recortar(original);
+  } catch (e) {
+    // `recortar` ya deja un mensaje humano — se publica tal cual.
+    console.error("falló el recorte de fondo", e);
+    return { ok: false, motivo: e instanceof Error ? e.message : NO_SE_PUDO_BAJAR };
+  }
+
+  return armarPlaca(datos, recortada);
 }

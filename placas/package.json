@@ -1,0 +1,27 @@
+{
+  "name": "botr-placas",
+  "version": "1.0.0",
+  "description": "Design system y generador de las placas de invitado de Builders Off The Record.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "placa": "tsx generar.ts",
+    "actual": "tsx generar.ts --datos muestra/gr.json --foto muestra/gr.png --salida placa-actual.png",
+    "hornear": "tsx hornear.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@shuding/opentype.js": "1.4.0-beta.0",
+    "@vercel/og": "^0.11.1",
+    "react": "^19.2.8",
+    "sharp": "^0.35.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "@types/react": "^19.2.18",
+    "tsx": "^4.23.5",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.10"
+  }
+}

@@ -35,7 +35,7 @@ function conversacionFalsa(estado: unknown): Conversacion & { publicadas: [strin
 }
 
 beforeEach(() => {
-  generarPlaca.mockResolvedValue({ png: PNG });
+  generarPlaca.mockResolvedValue({ ok: true, png: PNG });
   buscarCopy.mockResolvedValue({ rol: "CEO de Vercel", genero: "m", fuentes: [] });
 });
 
@@ -110,10 +110,11 @@ describe("generar_placa", () => {
 
     await h.generar_placa.execute(DATOS_COMPLETOS, {} as never);
 
-    const [datos] = generarPlaca.mock.calls[0];
+    const [datos, url] = generarPlaca.mock.calls[0];
     expect(datos.invitado.nombre).toBe("Guillermo Rauch");
-    expect(datos.fotoElegida).toEqual(FOTO);
-    expect(datos.fecha).toBe("jueves 6 de agosto");
+    expect(url).toBe(FOTO.url);
+    // `placas/` no interpreta fechas: llegan ya formateadas y en mayúsculas.
+    expect(datos.fecha).toBe("JUEVES 6 DE AGOSTO");
     expect(datos.enVivo).toBe(true);
   });
 });
@@ -124,9 +125,13 @@ describe("generar_placa — errores hacia el humano", () => {
   // privado de Slack. Medido en una corrida real contra Gemini: el agente
   // publicó ese texto crudo tal cual.
   it("no filtra el texto tecnico ni la url cuando el render falla", async () => {
-    generarPlaca.mockRejectedValue(
-      new Error("descarga: HTTP 400 en https://files.slack.com/secreto.jpg"),
-    );
+    // La firma nueva no tira: devuelve el motivo ya traducido. Lo que se
+    // verifica acá es que la herramienta no le agregue texto técnico encima ni
+    // filtre la URL del archivo privado.
+    generarPlaca.mockResolvedValue({
+      ok: false,
+      motivo: "No pude bajar la foto de Slack. Probá subirla de nuevo.",
+    });
     const conv = conversacionFalsa({
       nombre: "Guillermo Rauch",
       copy: { rol: "CEO de Vercel", genero: "m", fuentes: [] },
