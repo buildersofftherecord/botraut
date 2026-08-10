@@ -32,7 +32,11 @@ const NO_SE_PUDO_BAJAR =
  * Nunca tira: devuelve el motivo como texto publicable. Lo que sale de acá lo
  * repite el agente en el canal.
  */
-export async function generarPlaca(datos: unknown, urlFoto: string): Promise<ResultadoPlaca> {
+export async function generarPlaca(
+  datos: unknown,
+  urlFoto: string,
+  escalaSujeto?: number,
+): Promise<ResultadoPlaca> {
   let original: Buffer;
   try {
     original = await descargar(urlFoto, autorizacionSlack());
@@ -52,5 +56,5 @@ export async function generarPlaca(datos: unknown, urlFoto: string): Promise<Res
     return { ok: false, motivo: e instanceof Error ? e.message : NO_SE_PUDO_BAJAR };
   }
 
-  return armarPlaca(datos, recortada);
+  return armarPlaca(datos, recortada, { escalaSujeto });
 }

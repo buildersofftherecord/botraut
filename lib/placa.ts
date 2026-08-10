@@ -94,9 +94,23 @@ export async function armarPlaca(
 
   try {
     const l = LIENZOS[LIENZO];
-    const retrato = await prepararRetrato(foto, {
-      ancho: Math.round(l.ancho * l.fotoAncho * SUPERMUESTREO),
-      alto: altoDeFoto(l) * SUPERMUESTREO,
+    const ancho = Math.round(l.ancho * l.fotoAncho * SUPERMUESTREO);
+    const alto = altoDeFoto(l) * SUPERMUESTREO;
+    // Un afilado suave antes de escalar. La silueta se agranda entre 1.5× y
+    // 2.4× para llenar el cuadro, y el Lanczos ablanda los bordes; esto
+    // recupera algo de definición sin que se note como filtro. Va sobre la
+    // foto recortada y no sobre la placa, para no tocar la tipografía.
+    const afilada = await sharp(foto).sharpen({ sigma: 0.8, m1: 0.5, m2: 2 }).png().toBuffer();
+
+    const retrato = await prepararRetrato(afilada, {
+      ancho,
+      alto,
+      // Sin default propio: el 1.15 de `prepararRetrato` está calibrado para
+      // un plano de busto y funciona para la mayoría. Calcular la escala para
+      // que la silueta llene el alto se probó y da peor: el número coincide
+      // con la referencia pero el resultado es una cabeza gigante, porque el
+      // alto ocupado no es lo mismo que el encuadre. El README de `placas/`
+      // ya lo decía; esto lo confirma.
       ...(opciones.escalaSujeto !== undefined ? { escalaSujeto: opciones.escalaSujeto } : {}),
     });
     return { ok: true, png: await renderizar(datos, LIENZO, retrato) };

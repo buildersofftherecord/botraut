@@ -40,7 +40,7 @@ describe("generarPlaca — el orden importa", () => {
     await generarPlaca(DATOS, URL_SLACK);
 
     expect(recortar).toHaveBeenCalledWith(ORIGINAL);
-    expect(armarPlaca).toHaveBeenCalledWith(DATOS, RECORTADA);
+    expect(armarPlaca).toHaveBeenCalledWith(DATOS, RECORTADA, { escalaSujeto: undefined });
     expect(recortar.mock.invocationCallOrder[0]).toBeLessThan(armarPlaca.mock.invocationCallOrder[0]);
   });
 
@@ -96,5 +96,22 @@ describe("generarPlaca — errores hacia el humano", () => {
     if (r.ok) return;
     expect(r.motivo).toBe(humano);
     expect(armarPlaca).not.toHaveBeenCalled();
+  });
+});
+
+describe("generarPlaca — la escala del invitado", () => {
+  /**
+   * `prepararRetrato` escala la silueta por el ancho y deriva el alto, así que
+   * el tamaño final depende del encuadre de la foto: con los brazos cruzados
+   * la silueta es ancha, se achica para entrar, y el invitado queda bajo.
+   *
+   * Se probó calcularla para que llene el alto del cuadro y da peor: el número
+   * coincide con la referencia pero sale una cabeza gigante, porque el alto
+   * ocupado no es lo mismo que el encuadre. Por eso se pasa desde afuera,
+   * como pide `placas/README.md`.
+   */
+  it("le pasa la escala a armarPlaca cuando se la dan", async () => {
+    await generarPlaca(DATOS, URL_SLACK, 1.6);
+    expect(armarPlaca).toHaveBeenCalledWith(DATOS, RECORTADA, { escalaSujeto: 1.6 });
   });
 });

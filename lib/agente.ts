@@ -64,6 +64,11 @@ Cómo trabajás:
   en el thread; no hace falta que la describas ni que anuncies que la vas a
   mandar.
 
+- Si te dicen que el invitado salió chico o muy grande, volvé a llamar a
+  "generar_placa" con los mismos datos y el parámetro "escala" ajustado. No hay
+  forma automática de acertarle: depende del encuadre de la foto, así que se
+  corrige mirando el resultado.
+
 Hablás en castellano rioplatense, corto y directo, como un compañero de trabajo.
 Nada de "¡Perfecto!" ni "¡Excelente elección!". Si algo falta, lo pedís y ya.`;
 
@@ -97,6 +102,16 @@ export function crearHerramientas(conv: Conversacion) {
         fecha: z.string().describe('Como lo dijo el humano, por ejemplo "jueves 6 de agosto"'),
         hora: z.string().describe('Por ejemplo "21:00 hs"'),
         enVivo: z.boolean(),
+        escala: z
+          .number()
+          .min(0.8)
+          .max(2.2)
+          .optional()
+          .describe(
+            "Cuánto ocupa el invitado. Por defecto 1.15, calibrado para un plano de busto. " +
+              "Subilo si el humano dice que salió chico, bajalo si dice que salió muy grande. " +
+              "No lo mandes si no te lo pidieron.",
+          ),
       }),
       execute: async (datos) => {
         const crudo = await conv.estado();
@@ -123,6 +138,7 @@ export function crearHerramientas(conv: Conversacion) {
             enVivo: datos.enVivo,
           },
           estado.data.foto.url,
+          datos.escala,
         );
 
         if (!resultado.ok) return { ok: false, motivo: resultado.motivo };
