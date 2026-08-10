@@ -22,17 +22,23 @@ export async function recortar(entrada: Buffer): Promise<Buffer> {
     // carga cae en el `catch` de abajo como cualquier otro error.
     const { removeBackground } = await import("@imgly/background-removal-node");
 
-    // La librería lee `blob.type` directamente, sin detectar el formato por
-    // magic bytes — un Blob sin `type` tira "Unsupported format: " aunque
-    // los bytes sean un JPEG válido. `descargar()` no conserva el
-    // content-type de la respuesta HTTP, así que se detecta acá con sharp
-    // en vez de confiar en el header (que además puede faltar o mentir).
-    const { format } = await sharp(entrada).metadata();
+    // Se normaliza a PNG RGBA en vez de mandar los bytes como llegaron.
+    //
+    // La librería exige 4 canales: con una foto en blanco y negro tira "Only
+    // 4-channel images are supported", y las placas son en B/N así que la
+    // gente manda fotos ya convertidas. Esto también cubre CMYK y los PNG con
+    // paleta.
+    //
+    // De paso resuelve el otro problema que había acá: la librería lee
+    // `blob.type` sin detectar el formato por magic bytes, así que un Blob sin
+    // `type` fallaba aunque los bytes fueran válidos. Como ahora siempre
+    // sale PNG, el tipo es constante y no hay nada que adivinar.
+    const normalizada = await sharp(entrada).ensureAlpha().png().toBuffer();
 
     // `Buffer` sin genérico admite `SharedArrayBuffer`, que `BlobPart` no
     // acepta — de ahí la copia a un `Uint8Array` concreto.
     const salida = await removeBackground(
-      new Blob([new Uint8Array(entrada)], { type: `image/${format}` }),
+      new Blob([new Uint8Array(normalizada)], { type: "image/png" }),
     );
     return Buffer.from(await salida.arrayBuffer());
   } catch (e) {

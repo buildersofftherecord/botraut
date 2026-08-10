@@ -46,24 +46,6 @@ describe("recortar", () => {
     removeBackground.mockReset();
   });
 
-  it("le informa el formato real de la imagen a la librería", async () => {
-    // La librería lee `blob.type` sin ningún sniffing de magic bytes propio
-    // (confirmado leyendo su fuente compilada): un Blob sin `type` la hace
-    // tirar "Unsupported format: " incluso con bytes JPEG válidos adentro.
-    // Sin esta aserción, un mock de `removeBackground` que ignora el tipo
-    // (como el resto de este archivo) nunca detectaría esa regresión.
-    const jpeg = await unaFoto();
-
-    let tipoRecibido: string | undefined;
-    removeBackground.mockImplementation(async (blob: Blob) => {
-      tipoRecibido = blob.type;
-      return new Blob([new Uint8Array(jpeg)]);
-    });
-
-    await recortar(jpeg);
-    expect(tipoRecibido).toBe("image/jpeg");
-  });
-
   it("devuelve el recorte transparente que la librería produjo", async () => {
     const conAlpha = await sharp({
       create: { width: 40, height: 40, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
@@ -108,21 +90,21 @@ describe("recortar", () => {
     expect(removeBackground).not.toHaveBeenCalled();
   });
 
-  it("envuelve con el mismo mensaje humano un formato que sharp reconoce pero @imgly no soporta", async () => {
-    // TIFF: sharp lo lee sin problema, pero `imageDecode` de
-    // @imgly/background-removal-node (dist/index.mjs, leído para el fix de
-    // 96bd0fb) solo entiende image/png, image/jpeg, image/webp,
-    // application/octet-stream y sus dos formatos raw propios (x-alpha8,
-    // x-rgba8) — cualquier otro mime type, aunque sea sintácticamente
-    // válido, cae en su `default: throw new Error("Unsupported format: " +
-    // mime.type)`. El mock reproduce ese mismo criterio (no un
-    // `mockRejectedValue` fijo) para que el test dependa de qué tipo le
-    // llega, igual que la librería real.
+  it("un TIFF ahora funciona: antes moría por el mime type", async () => {
+    // `imageDecode` de @imgly sólo entiende png, jpeg, webp, octet-stream y
+    // sus dos formatos raw. Un TIFF —que sharp lee sin problema— caía en su
+    // `default: throw new Error("Unsupported format: ...")`, y lo único que
+    // hacíamos era envolverlo en un mensaje amable.
+    //
+    // Normalizando a PNG antes, la librería nunca ve un TIFF. El modo de falla
+    // desapareció en vez de quedar bien explicado. El mock aplica el mismo
+    // criterio que la librería real para que el test dependa del tipo que
+    // recibe, no de un rechazo fijo.
     removeBackground.mockImplementation(async (blob: Blob) => {
       if (!["image/jpeg", "image/png", "image/webp"].includes(blob.type)) {
         throw new Error(`Unsupported format: ${blob.type}`);
       }
-      return new Blob([]);
+      return new Blob([new Uint8Array([1, 2, 3])]);
     });
 
     const tiff = await sharp({
@@ -131,7 +113,50 @@ describe("recortar", () => {
       .tiff()
       .toBuffer();
 
-    await expect(recortar(tiff)).rejects.toThrow(/No pude recortar el fondo/);
-    await expect(recortar(tiff)).rejects.not.toThrow(/Unsupported format/);
+    await expect(recortar(tiff)).resolves.toBeInstanceOf(Buffer);
+  });
+});
+
+describe("recortar — normaliza los canales antes de pasar la imagen", () => {
+  /**
+   * `@imgly` exige 4 canales: con una foto en escala de grises tira "Only
+   * 4-channel images are supported". Pasó en producción con una foto real, y
+   * es un caso probable — las placas son en blanco y negro, así que la gente
+   * manda fotos ya convertidas.
+   *
+   * Se verifica sobre los bytes que efectivamente recibe la librería, no sobre
+   * los que entran a `recortar`: lo que importa es que llegue RGBA.
+   */
+  it("convierte una imagen de un solo canal a RGBA", async () => {
+    const grises = await sharp({
+      create: { width: 100, height: 100, channels: 3, background: { r: 90, g: 90, b: 90 } },
+    })
+      .greyscale()
+      .toColourspace("b-w")
+      .jpeg()
+      .toBuffer();
+    expect((await sharp(grises).metadata()).channels).toBe(1);
+
+    await recortar(grises);
+
+    const [blob] = removeBackground.mock.calls[0];
+    const recibido = Buffer.from(await blob.arrayBuffer());
+    expect((await sharp(recibido).metadata()).channels).toBe(4);
+  });
+
+  // Y el tipo del Blob deja de depender de con qué formato llegó la foto: la
+  // librería lee `blob.type` sin mirar los magic bytes, así que un tipo
+  // constante saca esa variable del medio.
+  it("siempre declara image/png", async () => {
+    const jpeg = await sharp({
+      create: { width: 100, height: 100, channels: 3, background: { r: 90, g: 90, b: 90 } },
+    })
+      .jpeg()
+      .toBuffer();
+
+    await recortar(jpeg);
+
+    const [blob] = removeBackground.mock.calls[0];
+    expect(blob.type).toBe("image/png");
   });
 });
