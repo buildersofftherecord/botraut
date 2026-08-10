@@ -26,9 +26,21 @@ export const InvitadoSchema = z.object({
 });
 
 /**
- * El mínimo de 800px sale de que la foto se renderiza a ~1080 de alto: por
- * debajo de eso se pixela de forma visible.
+ * El piso de tamaño del archivo, en un solo lugar.
+ *
+ * Vive acá y no en `lib/foto.ts` para no invertir la dirección de los imports
+ * —`foto.ts` ya importa de este archivo— y porque el schema es el que
+ * finalmente rechaza: `validarFoto` puede aceptar una foto y `FotoSchema.parse`
+ * tirarla igual al guardarla. Eso pasó en producción con una de 570×570: la
+ * validación la dejaba pasar con el mínimo en 420 y el schema la rechazaba con
+ * el suyo en 800, y el ZodError se escapaba sin que nadie lo atrapara.
+ *
+ * El valor sale de la placa aprobada, no de una estimación: `placas/muestra/gr.png`
+ * mide 561×505 y es la foto que produce `placa-actual.png`. Un piso que
+ * descarta la referencia del sistema está mal por definición.
  */
+export const LADO_MINIMO = 420;
+
 export const FotoSchema = z.object({
   url: z.string().url(),
   /**
@@ -37,8 +49,8 @@ export const FotoSchema = z.object({
    * persona, no una URL. Ver spec §3.1.
    */
   fuente: z.string().optional(),
-  ancho: z.number().int().min(800),
-  alto: z.number().int().min(800),
+  ancho: z.number().int().min(LADO_MINIMO),
+  alto: z.number().int().min(LADO_MINIMO),
 });
 
 export const PlacaSchema = z.object({

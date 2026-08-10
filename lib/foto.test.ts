@@ -17,7 +17,8 @@ vi.mock("./recorte", () => ({ recortar }));
 vi.mock("./silueta", () => ({ recortarASilueta }));
 vi.mock("./mirar", () => ({ mirarSilueta }));
 
-const { validarFoto, PEDIDO_DE_FOTO, ALTO_MINIMO_SILUETA, LADO_MINIMO } = await import("./foto");
+const { validarFoto, PEDIDO_DE_FOTO, ALTO_MINIMO_SILUETA } = await import("./foto");
+const { LADO_MINIMO, FotoSchema } = await import("./tipos");
 const { LIENZOS, altoDeFoto } = await import("../placas/lienzos");
 
 // El alto al que el render efectivamente lleva la silueta, no el del lienzo:
@@ -238,6 +239,17 @@ describe("los umbrales contra la placa aprobada", () => {
    * Se lee el archivo real en vez de fijar el número a mano: si alguien cambia
    * la foto de muestra, este test sigue midiendo lo correcto.
    */
+  /**
+   * El bug que junta los dos: `validarFoto` aceptaba una foto de 570×570 con
+   * el mínimo en 420 y `FotoSchema.parse` la rechazaba con el suyo en 800 al
+   * guardarla. El ZodError se escapaba sin que nadie lo atrapara y el handler
+   * moría en silencio.
+   */
+  it("lo que acepta validarFoto lo acepta FotoSchema", () => {
+    const enElBorde = { url: "https://x/a.png", ancho: LADO_MINIMO, alto: LADO_MINIMO };
+    expect(() => FotoSchema.parse(enElBorde)).not.toThrow();
+  });
+
   it("el filtro previo del archivo no descarta la foto de la placa aprobada", async () => {
     const { readFile } = await import("node:fs/promises");
     const { join, dirname } = await import("node:path");

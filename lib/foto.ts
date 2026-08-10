@@ -3,18 +3,13 @@ import { recortar } from "./recorte";
 import { recortarASilueta, type Silueta } from "./silueta";
 import { mirarSilueta, type Veredicto } from "./mirar";
 import { LIENZOS, altoDeFoto } from "../placas/lienzos";
-import type { Foto } from "./tipos";
+import { LADO_MINIMO, type Foto } from "./tipos";
 
 /**
- * Filtro barato, antes de correr ningún modelo: descarta lo que evidentemente
- * no sirve sin pagar los segundos de `recortar()`. No es la validación real,
- * que mide la silueta (ver `ALTO_MINIMO_SILUETA`).
- *
- * Estaba en 800 y eso rechazaba la foto del propio diseño aprobado, que mide
- * 561×505. Un filtro previo que descarta la referencia del sistema no es un
- * filtro, es un bug.
+ * `LADO_MINIMO` sale de `lib/tipos.ts`, donde lo usa `FotoSchema`. Tenerlo en
+ * dos lugares ya rompió producción: la validación aceptaba una foto de 570×570
+ * y el schema la rechazaba al guardarla.
  */
-export const LADO_MINIMO = 420;
 
 /**
  * Task 22b: ya no se mide la proporción del archivo — una foto apaisada puede
