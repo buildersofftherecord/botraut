@@ -2,7 +2,7 @@ import sharp from "sharp";
 import { recortar } from "./recorte";
 import { recortarASilueta, type Silueta } from "./silueta";
 import { mirarSilueta, type Veredicto } from "./mirar";
-import { LIENZOS, altoDeFoto } from "../marca/lienzos";
+import { LIENZOS, altoDeFoto } from "../placas/lienzos";
 import type { Foto } from "./tipos";
 
 /**
@@ -28,7 +28,7 @@ const LADO_MINIMO = 800;
  * Por encima de eso sí conviene pedir otra.
  */
 const AUMENTO_MAXIMO = 1.45;
-export const ALTO_MINIMO_SILUETA = Math.round(altoDeFoto(LIENZOS["4:5"]) / AUMENTO_MAXIMO);
+export const ALTO_MINIMO_SILUETA = Math.round(altoDeFoto(LIENZOS["1:1"]) / AUMENTO_MAXIMO);
 
 export type ResultadoValidacion =
   | { ok: true; foto: Pick<Foto, "ancho" | "alto"> }
