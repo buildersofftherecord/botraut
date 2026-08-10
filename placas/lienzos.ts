@@ -29,6 +29,14 @@ export type Lienzo = {
    * comienzo de la foto: con `fotoAncho` 0.48 y márgenes de 40+20, eso es
    * cualquier valor arriba de ~460 en 1080.
    */
+  /**
+   * Ancho del wordmark, en px.
+   *
+   * El 1:1 usa 320 y los demás siguen en 400-460: se bajó mirando renders
+   * reales. A 440 el logo competía con la caja de datos por el peso de la
+   * mitad inferior. Los otros lienzos no están calibrados, así que se dejaron
+   * como estaban en vez de arrastrarles un número elegido para el cuadrado.
+   */
   logoAncho: number;
   /**
    * Ancho fijo de la caja de datos, en px.
@@ -54,7 +62,7 @@ export type Lienzo = {
  * ajustarlos a ojo cuando se activen.
  */
 export const LIENZOS = {
-  "1:1": { ancho: 1080, alto: 1080, margen: 40, nombreTamano: 200, rolTamano: 25, fotoAncho: 0.48, logoAncho: 440, cajaAncho: 480 },
+  "1:1": { ancho: 1080, alto: 1080, margen: 40, nombreTamano: 200, rolTamano: 25, fotoAncho: 0.48, logoAncho: 320, cajaAncho: 480 },
   "4:5": { ancho: 1080, alto: 1350, margen: 44, nombreTamano: 210, rolTamano: 26, fotoAncho: 0.46, logoAncho: 440, cajaAncho: 480 },
   "9:16": { ancho: 1080, alto: 1920, margen: 48, nombreTamano: 220, rolTamano: 28, fotoAncho: 0.5, logoAncho: 460, cajaAncho: 500 },
   "16:9": { ancho: 1280, alto: 720, margen: 32, nombreTamano: 142, rolTamano: 20, fotoAncho: 0.38, logoAncho: 400, cajaAncho: 380 },
