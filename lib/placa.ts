@@ -54,6 +54,19 @@ const DESVANECIDO_BASE = 0.12;
  *
  * Sigue siendo un default, no una regla. El encuadre de cada foto es distinto y
  * el agente puede subirlo o bajarlo si el humano se lo pide.
+ *
+ * Se intentó calcularlo dos veces y las dos salieron peor:
+ *
+ * - Escalando para que la silueta llene el alto del cuadro: el número
+ *   coincidía con la referencia pero salía una cabeza gigante, porque el alto
+ *   ocupado no es lo mismo que el encuadre.
+ * - Normalizando por el ancho de la cabeza, para compensar cuánto cuerpo hay
+ *   en cuadro: la medida agarra el pelo, que en un peinado angosto infla la
+ *   escala y termina cortando la cabeza.
+ *
+ * 1.3 fijo funciona en las dos fotos de prueba, con encuadres distintos. Si
+ * alguna vez falla, el camino no es un tercer heurístico sino que el agente lo
+ * ajuste, que es lo que ya puede hacer.
  */
 const ESCALA_SUJETO = 1.3;
 
