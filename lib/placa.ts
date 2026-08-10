@@ -44,6 +44,40 @@ const TRANSPARENCIA_MINIMA = 0.08;
  */
 const DESVANECIDO_BASE = 0.12;
 
+/**
+ * Cuánto se baja el invitado dentro de su cuadro, en fracción del alto.
+ *
+ * `prepararRetrato` lo ancla arriba con `top: 0` y no expone offset. Lo hace a
+ * propósito y está documentado: anclado al piso, la cara arrancaba al 27% del
+ * alto contra el 12-17% de las cinco placas originales, y el invitado quedaba
+ * colgando.
+ *
+ * El 6% despega la cabeza del borde superior sin volver a ese problema. Se
+ * eligió comparando renders (0%, 3%, 6% y 10%), no por teoría.
+ *
+ * Lo que se va por abajo se recorta, pero ahí está el degradado de la base, así
+ * que no aparece un corte duro.
+ */
+const BAJAR_INVITADO = 0.06;
+
+/** Desplaza el retrato hacia abajo dentro de su cuadro, sin cambiarle el tamaño. */
+async function bajarEnElCuadro(retrato: Buffer, ancho: number, alto: number): Promise<Buffer> {
+  const bajar = Math.round(alto * BAJAR_INVITADO);
+  if (bajar <= 0) return retrato;
+
+  const recortado = await sharp(retrato)
+    .extract({ left: 0, top: 0, width: ancho, height: alto - bajar })
+    .png()
+    .toBuffer();
+
+  return sharp({
+    create: { width: ancho, height: alto, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+  })
+    .composite([{ input: recortado, left: 0, top: bajar }])
+    .png()
+    .toBuffer();
+}
+
 export type ResultadoPlaca =
   | { ok: true; png: Buffer }
   | { ok: false; motivo: string };
@@ -127,7 +161,7 @@ export async function armarPlaca(
       desvanecidoBase: DESVANECIDO_BASE,
       ...(opciones.escalaSujeto !== undefined ? { escalaSujeto: opciones.escalaSujeto } : {}),
     });
-    return { ok: true, png: await renderizar(datos, LIENZO, retrato) };
+    return { ok: true, png: await renderizar(datos, LIENZO, await bajarEnElCuadro(retrato, ancho, alto)) };
   } catch (e) {
     // Acá se corta cualquier texto técnico: lo que devuelve esta función lo
     // repite el agente en el canal.

@@ -86,7 +86,7 @@ export const FUENTE = {
  * Reemplaza a la lluvia de ceros y unos que usaban las placas viejas. Los
  * números salen de comparar renders reales, no de teoría:
  *
- * - `opacidad: 0.025` — al 10% las bandas BO/TR cruzan por el nombre y le comen
+ * - `opacidad: 0.02` — al 10% las bandas BO/TR cruzan por el nombre y le comen
  *   el peso; al 2% solo asoma en las zonas oscuras y se lee como ruido de
  *   compresión. Estuvo en 0.03 y se bajó mirando placas reales en Slack: a ese
  *   valor la trama competía de más con la foto del invitado.
@@ -101,7 +101,7 @@ export const FUENTE = {
  */
 export const FONDO = {
   monograma: "botr-monograma-cuadrado-sin-placa-neg.svg",
-  opacidad: 0.025,
+  opacidad: 0.02,
   columnas: 6,
   atenuarNombre: true,
   /** Alfa del grano de `.tv-overlay`, mismo feTurbulence que la landing. */
