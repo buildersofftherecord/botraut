@@ -11,19 +11,26 @@ import { HUD, COLOR, FUENTE } from "../tokens";
  */
 export function Etiqueta({
   children,
-  color = COLOR.blanco,
+  color = COLOR.hud,
   escala = 1,
+  tamano = HUD.labelTamano,
 }: {
   children: string;
   color?: string;
   escala?: number;
+  /**
+   * Cuerpo en px del tamaño de diseño. La caja de datos lo sube: fecha y hora
+   * son la única información accionable de la placa, y al tamaño de las demás
+   * etiquetas quedaban en 7pt sobre el feed — ilegibles sin ampliar.
+   */
+  tamano?: number;
 }) {
   return (
     <div
       style={{
         display: "flex",
         fontFamily: FUENTE.mono,
-        fontSize: HUD.labelTamano * escala,
+        fontSize: tamano * escala,
         // Tracking en em: relativo al fontSize, ya escala con él. Escalarlo
         // de nuevo lo duplicaría.
         letterSpacing: HUD.labelTracking,

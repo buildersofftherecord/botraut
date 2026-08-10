@@ -65,13 +65,16 @@ describe("MAX_CARACTERES_FILA", () => {
     const buf = await readFile("fuentes/IBMPlexMono-Regular.ttf");
     const font = parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
 
-    // Geometría de la fila, de `Placa.tsx`: padding 34 a cada lado, borde 1 a
+    // Geometría de la fila, de `Placa.tsx`: padding 34 a cada lado, borde 2 a
     // cada lado, ícono 22, gap 20, separador 1, gap 20.
-    const PADDING = 34, BORDE = 1, ICONO = 22, GAP = 20, SEPARADOR = 1;
+    const PADDING = 34, BORDE = 2, ICONO = 22, GAP = 20, SEPARADOR = 1;
     const presupuesto =
       LIENZOS["1:1"].cajaAncho - PADDING * 2 - BORDE * 2 - ICONO - GAP - SEPARADOR - GAP;
 
-    const tamano = HUD.labelTamano;
+    // `datosTamano`, no `labelTamano`: las filas de la caja se separaron del
+    // resto de las etiquetas cuando fecha y hora subieron de cuerpo. Medir con
+    // el tamaño equivocado hacía pasar el test con un límite que no era.
+    const tamano = HUD.datosTamano;
     const tracking = parseFloat(HUD.labelTracking) * tamano;
     const anchoDe = (n: number) => font.getAdvanceWidth("M".repeat(n), tamano) + tracking * (n - 1);
 

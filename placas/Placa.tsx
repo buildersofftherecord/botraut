@@ -6,7 +6,7 @@ import { ImageResponse } from "@vercel/og";
 import sharp from "sharp";
 import { cargarFuentes } from "./fuentes/index";
 import { LIENZOS, type Lienzo, type NombreLienzo } from "./lienzos";
-import { COLOR, NOMBRE_COLOR, FUENTE } from "./tokens";
+import { COLOR, NOMBRE_COLOR, FUENTE, HUD } from "./tokens";
 import { Etiqueta, PuntoRec } from "./primitivos/Hud";
 import { IconoCalendario, IconoReloj, IconoSenal } from "./primitivos/Iconos";
 import { generarFijo, rutaFijo } from "./primitivos/Fijo";
@@ -146,7 +146,7 @@ export async function renderizarConFactor(
               fontFamily: FUENTE.mono,
               fontSize: l.rolTamano,
               lineHeight: 1.5,
-              color: COLOR.t75,
+              color: COLOR.rol,
               marginTop: 30 * s,
             }}
           >
@@ -161,13 +161,17 @@ export async function renderizarConFactor(
           style={{
             position: "absolute",
             left: l.margen + 28 * s,
-            bottom: l.margen + 60 * s,
+            bottom: l.margen + 130 * s,
             display: "flex",
             flexDirection: "column",
             width: l.cajaAncho,
-            border: `${1 * s}px solid ${COLOR.linea}`,
-            padding: `${26 * s}px ${34 * s}px`,
-            gap: 22 * s,
+            // El filete vuelve, pero a `lineaViva` y de 2px. Al alfa 0.1 y 1px
+            // daba contraste 1.3:1 contra el fondo: invisible en el feed y lo
+            // primero que se come la compresión de Instagram. Sin filete, las
+            // tres filas quedan flotando sin contención.
+            border: `${2 * s}px solid ${COLOR.lineaViva}`,
+            padding: `${40 * s}px ${34 * s}px`,
+            gap: 34 * s,
           }}
         >
           {[
@@ -180,7 +184,7 @@ export async function renderizarConFactor(
               <div style={{ display: "flex", width: 1 * s, height: 24 * s, background: COLOR.linea }} />
               <div style={{ display: "flex", alignItems: "center", gap: 10 * s }}>
                 {fila.vivo ? <PuntoRec tamano={8} escala={s} /> : null}
-                <Etiqueta color={COLOR.t75} escala={s}>{fila.texto}</Etiqueta>
+                <Etiqueta color={COLOR.datos} escala={s} tamano={HUD.datosTamano}>{fila.texto}</Etiqueta>
               </div>
             </div>
           ))}

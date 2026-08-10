@@ -15,35 +15,36 @@ export const COLOR = {
   t75: "rgba(255,255,255,0.75)",
   t55: "rgba(255,255,255,0.55)",
   t35: "rgba(255,255,255,0.35)",
+  /**
+   * Escalones por debajo del nombre. Antes el rol y la caja usaban `t75`
+   * (191) y el HUD blanco puro, así que el texto chico gritaba más que el
+   * nombre. Estos valores los ordenan por importancia real.
+   */
+  rol: "#8a8a8a",
+  datos: "#9a9a9a",
+  hud: "#6e6e6e",
 } as const;
 
 /**
- * El nombre **no va en blanco puro**. Medido sobre las placas de referencia,
- * el interior de los trazos da p50=163, p75=168, p90=176 — un gris, no
- * `#ffffff`. La primera versión daba 251 de media y por eso se veía dura
- * contra el negro.
+ * El nombre es **el único elemento a blanco puro de toda la placa**.
  *
- * Este valor sí se deriva de la imagen, a diferencia del resto de `COLOR`:
- * es una decisión del diseño de la placa, no un token del sistema que
- * compartimos con `landing/`.
+ * Estuvo en `#a5a5a5` (171), derivado de medir placas viejas. Pero medido
+ * adentro de esta placa, el midtone de la cara da 174: el nombre y el retrato
+ * quedaban al mismo valor, compitiendo empatados, sin figura ni fondo. Y las
+ * etiquetas de 15px estaban en 255 — el doble de contraste que el nombre del
+ * invitado.
+ *
+ * La regla ahora es una sola: un solo elemento a 255, y es el nombre. Todo lo
+ * demás baja para dejarle lugar.
  */
-export const NOMBRE_COLOR = "#a5a5a5";
+export const NOMBRE_COLOR = "#ffffff";
 
 /**
- * El wordmark de abajo a la derecha va **al mismo gris que el nombre**, no en
- * blanco.
- *
- * No es una preferencia: medido sobre las placas de referencia, la tinta clara
- * de la bandera da p50 148 / 174 / 172 en Veiras, Naomi y Ariana — mediana ~165,
- * que es exactamente `NOMBRE_COLOR`. En las originales el nombre y la bandera
- * están en el mismo valor, y la jerarquía entre ellos la lleva el **tamaño**,
- * no el brillo. Lo único blanco puro es el texto chico del HUD, que por chico
- * no pesa.
- *
- * En blanco (255) el logo era lo más contrastado de la placa: el elemento menos
- * importante ganaba la primera mirada.
+ * El wordmark ya no sigue al nombre: con el nombre en 255, igualarlo pondría
+ * dos elementos peleando por el máximo. Queda en el gris que el nombre tenía
+ * antes, que es donde funcionaba.
  */
-export const LOGO_COLOR = NOMBRE_COLOR;
+export const LOGO_COLOR = "#a5a5a5";
 
 /**
  * De `.hud-label` en globals.css, más `--fs-hud` y `--tr-hud`.
@@ -65,6 +66,24 @@ export const LOGO_COLOR = NOMBRE_COLOR;
  */
 export const HUD = {
   labelTamano: 20,
+  /**
+   * Fecha y hora. Más grande que el resto de las etiquetas a propósito: es lo
+   * único de la placa que alguien tiene que poder leer para actuar, y a 20px
+   * quedaba en 7pt sobre el ancho real del feed.
+   *
+   * 23 y no más, y el techo no lo fija el gusto: lo fija el contenido.
+   *
+   * La fecha más larga que el sistema acepta es "JUEVES 30 DE SEPTIEMBRE", 23
+   * caracteres, y tiene que entrar en una línea. La caja no puede pasar de
+   * 550px sin montarse sobre la foto. Con esas dos restricciones, 23 es el
+   * cuerpo más grande posible: a 24 la fecha de septiembre ya no entra.
+   *
+   * La crítica de diseño pedía 34-38 para que fuera legible en el feed. Ese
+   * número es incompatible con las dos restricciones de arriba — a 28 sólo
+   * entran 19 caracteres. Si hiciera falta más cuerpo, habría que abreviar la
+   * fecha o mover la caja, no forzar el tamaño.
+   */
+  datosTamano: 23,
   labelTracking: "0.16em",
 } as const;
 

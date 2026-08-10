@@ -62,7 +62,7 @@ export type Lienzo = {
  * ajustarlos a ojo cuando se activen.
  */
 export const LIENZOS = {
-  "1:1": { ancho: 1080, alto: 1080, margen: 40, nombreTamano: 200, rolTamano: 25, fotoAncho: 0.48, logoAncho: 320, cajaAncho: 480 },
+  "1:1": { ancho: 1080, alto: 1080, margen: 40, nombreTamano: 200, rolTamano: 25, fotoAncho: 0.48, logoAncho: 320, cajaAncho: 550 },
   "4:5": { ancho: 1080, alto: 1350, margen: 44, nombreTamano: 210, rolTamano: 26, fotoAncho: 0.46, logoAncho: 440, cajaAncho: 480 },
   "9:16": { ancho: 1080, alto: 1920, margen: 48, nombreTamano: 220, rolTamano: 28, fotoAncho: 0.5, logoAncho: 460, cajaAncho: 500 },
   "16:9": { ancho: 1280, alto: 720, margen: 32, nombreTamano: 142, rolTamano: 20, fotoAncho: 0.38, logoAncho: 400, cajaAncho: 380 },
