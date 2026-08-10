@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { default as sharpReal } from "sharp";
 import sharp from "sharp";
 
 /**
@@ -16,7 +17,7 @@ vi.mock("./recorte", () => ({ recortar }));
 vi.mock("./silueta", () => ({ recortarASilueta }));
 vi.mock("./mirar", () => ({ mirarSilueta }));
 
-const { validarFoto, PEDIDO_DE_FOTO, ALTO_MINIMO_SILUETA } = await import("./foto");
+const { validarFoto, PEDIDO_DE_FOTO, ALTO_MINIMO_SILUETA, LADO_MINIMO } = await import("./foto");
 const { LIENZOS, altoDeFoto } = await import("../placas/lienzos");
 
 // El alto al que el render efectivamente lleva la silueta, no el del lienzo:
@@ -57,17 +58,19 @@ describe("validarFoto — chequeos baratos, antes de correr ningún modelo", () 
   });
 
   it("rechaza un archivo por debajo del mínimo, con el ancho real, sin correr el modelo", async () => {
-    const r = await validarFoto(await imagen(480, 640));
+    // 300 queda por debajo del mínimo del archivo (420), que se bajó desde 800
+    // cuando se vio que 800 descartaba la foto del propio diseño aprobado.
+    const r = await validarFoto(await imagen(300, 640));
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect(r.motivo).toContain("480");
+      expect(r.motivo).toContain("300");
       expect(r.motivo.toLowerCase()).toContain("pixel");
     }
     expect(recortar).not.toHaveBeenCalled();
   });
 
   it("acepta exactamente en el mínimo del archivo y sigue al recorte", async () => {
-    await validarFoto(await imagen(800, 800));
+    await validarFoto(await imagen(LADO_MINIMO, LADO_MINIMO));
     expect(recortar).toHaveBeenCalledTimes(1);
   });
 
@@ -113,8 +116,22 @@ describe("ALTO_MINIMO_SILUETA", () => {
   // Valor literal a propósito: los tests de abajo lo usan para ubicarse en el
   // borde, así que derivan de él y pasarían con cualquier número. Lo único que
   // puede fijar el valor es escribirlo.
-  it("es 700px", () => {
-    expect(ALTO_MINIMO_SILUETA).toBe(700);
+  it("es 483px", () => {
+    expect(ALTO_MINIMO_SILUETA).toBe(483);
+  });
+
+  /**
+   * El ancla real, y la que hace que este número no se pueda inventar:
+   * `placas/muestra/gr.png` es la foto que produce `placa-actual.png`, el
+   * diseño aprobado. Su sujeto mide 436×505.
+   *
+   * Con el umbral en 700 —derivado de una teoría mía sobre cuánto se puede
+   * agrandar sin que se note— el sistema rechazaba fotos con más resolución
+   * que la de su propia referencia. Si un umbral rechaza el caso aprobado, el
+   * umbral está mal, no la foto.
+   */
+  it("deja pasar el sujeto de la placa aprobada, que mide 505 de alto", () => {
+    expect(ALTO_MINIMO_SILUETA).toBeLessThanOrEqual(505);
   });
 
   // El invariante real. Exigir el alto exacto al que el render lleva la
@@ -208,5 +225,26 @@ describe("PEDIDO_DE_FOTO", () => {
     const p = PEDIDO_DE_FOTO.toLowerCase();
     expect(p).toContain("medio cuerpo");
     expect(p).toContain("fondo");
+  });
+});
+
+describe("los umbrales contra la placa aprobada", () => {
+  /**
+   * `placas/muestra/gr.png` mide 561×505 y es la foto del diseño aprobado. El
+   * filtro barato estaba en 800px de lado, así que habría descartado la propia
+   * referencia del sistema antes de mirarla. Un filtro previo que rechaza el
+   * caso aprobado no es un filtro, es un bug.
+   *
+   * Se lee el archivo real en vez de fijar el número a mano: si alguien cambia
+   * la foto de muestra, este test sigue midiendo lo correcto.
+   */
+  it("el filtro previo del archivo no descarta la foto de la placa aprobada", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const { join, dirname } = await import("node:path");
+    const { fileURLToPath } = await import("node:url");
+    const ruta = join(dirname(fileURLToPath(import.meta.url)), "..", "placas", "muestra", "gr.png");
+    const { width, height } = await sharpReal(await readFile(ruta)).metadata();
+
+    expect(Math.min(width!, height!)).toBeGreaterThanOrEqual(LADO_MINIMO);
   });
 });

@@ -6,12 +6,15 @@ import { LIENZOS, altoDeFoto } from "../placas/lienzos";
 import type { Foto } from "./tipos";
 
 /**
- * Filtro barato, antes de correr ningún modelo: si el archivo entero ya mide
- * menos que esto, la silueta que quede adentro va a medir menos todavía. No
- * es la validación real (ver `ALTO_MINIMO_SILUETA`) — es solo para no gastar
- * los segundos de `recortar()` en algo que ya sabemos que no sirve.
+ * Filtro barato, antes de correr ningún modelo: descarta lo que evidentemente
+ * no sirve sin pagar los segundos de `recortar()`. No es la validación real,
+ * que mide la silueta (ver `ALTO_MINIMO_SILUETA`).
+ *
+ * Estaba en 800 y eso rechazaba la foto del propio diseño aprobado, que mide
+ * 561×505. Un filtro previo que descarta la referencia del sistema no es un
+ * filtro, es un bug.
  */
-const LADO_MINIMO = 800;
+export const LADO_MINIMO = 420;
 
 /**
  * Task 22b: ya no se mide la proporción del archivo — una foto apaisada puede
@@ -24,10 +27,15 @@ const LADO_MINIMO = 800;
  * y con Lanczos eso no se ve. Rechazarla mandaba al humano a buscar otra foto
  * por nada — el mismo sobre-rechazo que motivó la Task 22b.
  *
- * 1.45× es donde el escalado empieza a ablandar los bordes de forma visible.
- * Por encima de eso sí conviene pedir otra.
+ * El tope sale de la placa aprobada, no de una teoría: `placas/muestra/gr.png`
+ * —la foto que produce `placa-actual.png`— tiene un sujeto de 436×505 y el
+ * render lo lleva a 1015, o sea 2.01×. Con el 1.45× que había antes, esa misma
+ * foto habría sido rechazada por el sistema que la usa como referencia.
+ *
+ * El grano y la curva de negros de `prepararRetrato` disimulan bastante el
+ * escalado a tamaño de Instagram; el README de `placas/` lo dice explícito.
  */
-const AUMENTO_MAXIMO = 1.45;
+const AUMENTO_MAXIMO = 2.1;
 export const ALTO_MINIMO_SILUETA = Math.round(altoDeFoto(LIENZOS["1:1"]) / AUMENTO_MAXIMO);
 
 export type ResultadoValidacion =
@@ -140,4 +148,4 @@ export async function validarFoto(bytes: Buffer): Promise<ResultadoValidacion> {
 /** El texto que el bot postea cuando pide la foto por primera vez. */
 export const PEDIDO_DE_FOTO =
   "Mandame una foto donde se te vea de medio cuerpo para arriba, con el fondo lo más " +
-  "despejado posible y de 1200px de lado o más — así la silueta queda nítida al recortarla.";
+  "despejado posible. Cuanta más resolución, mejor: si la persona ocupa poco del cuadro, la silueta queda blanda al agrandarla.";
