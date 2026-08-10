@@ -78,6 +78,43 @@ async function bajarEnElCuadro(retrato: Buffer, ancho: number, alto: number): Pr
     .toBuffer();
 }
 
+/**
+ * Le saca a la foto la definición que ya tiene, antes de que el pipeline la
+ * agrande.
+ *
+ * **No agrega detalle.** Lo que hace un modelo de superresolución —inventar
+ * textura plausible que no está en el original— es otra cosa y necesita o un
+ * modelo local de ~100MB o una API paga. Esto es lo que se puede hacer gratis
+ * y determinista.
+ *
+ * El orden importa y se eligió comparando renders:
+ *
+ * 1. Duplicar primero. Le da al realce el doble de píxeles con que trabajar; a
+ *    tamaño original el efecto es mucho más pobre.
+ * 2. `clahe` — contraste local por baldosas. Es lo que hace que se lea la
+ *    textura de la ropa y las facciones, y buena parte de lo que se percibe
+ *    como "HD".
+ * 3. Afilar al final, sobre la imagen ya realzada.
+ *
+ * Va sobre la foto recortada y nunca sobre la placa, para no tocar la
+ * tipografía ni el fondo.
+ */
+async function realzar(foto: Buffer): Promise<Buffer> {
+  const { width } = await sharp(foto).metadata();
+  if (!width) return foto;
+
+  const doble = await sharp(foto)
+    .resize({ width: width * 2, kernel: sharp.kernel.lanczos3 })
+    .png()
+    .toBuffer();
+
+  return sharp(doble)
+    .clahe({ width: 96, height: 96, maxSlope: 3 })
+    .sharpen({ sigma: 1.2, m1: 0.5, m2: 2 })
+    .png()
+    .toBuffer();
+}
+
 export type ResultadoPlaca =
   | { ok: true; png: Buffer }
   | { ok: false; motivo: string };
@@ -143,11 +180,7 @@ export async function armarPlaca(
     const l = LIENZOS[LIENZO];
     const ancho = Math.round(l.ancho * l.fotoAncho * SUPERMUESTREO);
     const alto = altoDeFoto(l) * SUPERMUESTREO;
-    // Un afilado suave antes de escalar. La silueta se agranda entre 1.5× y
-    // 2.4× para llenar el cuadro, y el Lanczos ablanda los bordes; esto
-    // recupera algo de definición sin que se note como filtro. Va sobre la
-    // foto recortada y no sobre la placa, para no tocar la tipografía.
-    const afilada = await sharp(foto).sharpen({ sigma: 0.8, m1: 0.5, m2: 2 }).png().toBuffer();
+    const afilada = await realzar(foto);
 
     const retrato = await prepararRetrato(afilada, {
       ancho,
