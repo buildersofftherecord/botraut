@@ -30,23 +30,19 @@ export const bot = new Chat({
 const MENSAJES_DE_CONTEXTO = 12;
 
 /**
- * Turno 1: alguien tira un nombre en el canal. `onNewMessage` solo dispara en
- * threads que el bot todavía no siguió.
- */
-bot.onNewMessage(/\S/, async (thread, message) => {
-  await atender(thread, message);
-  // Sin esto la próxima respuesta vuelve a caer acá como si fuera un nombre
-  // nuevo: `onNewMessage` deja de disparar cuando el thread está subscripto.
-  await thread.subscribe();
-});
-
-/**
- * Mencionarlo es el instinto natural de cualquiera, y sin este handler el
- * evento llega, se procesa y no lo escucha nadie: el bot queda mudo sin que
- * aparezca ningún error. Ya pasó una vez.
+ * Arranca **solo si lo mencionan**. Antes también escuchaba cualquier mensaje
+ * del canal con `onNewMessage(/\S/)`, y eso lo hacía insoportable: cada cosa
+ * que alguien escribía —tuviera o no que ver con placas— le abría una
+ * conversación de invitado, y encima gastaba una llamada a Gemini por mensaje
+ * ajeno.
+ *
+ * El costo de sacarlo es que ya no se puede tirar el nombre pelado y que
+ * arranque solo. En un canal compartido conviene el intercambio.
  */
 bot.onNewMention(async (thread, message) => {
   await atender(thread, message);
+  // Sin esto la próxima respuesta del humano no llega: `onSubscribedMessage`
+  // solo dispara en threads que el bot ya sigue.
   await thread.subscribe();
 });
 
