@@ -31,6 +31,19 @@ const SUPERMUESTREO = 2;
  */
 const TRANSPARENCIA_MINIMA = 0.08;
 
+/**
+ * Cuánto de la base del invitado se disuelve en el negro.
+ *
+ * `prepararRetrato` usa 0.28 por defecto, y existe porque el wordmark es más
+ * chico que la bandera de tela de las placas originales: sin degradado, el
+ * invitado queda cortado a filo contra el borde inferior.
+ *
+ * A 0.28 se come los brazos. Se bajó a 0.12 mirando el resultado — alcanza para
+ * que el corte no se note y deja ver la mitad de abajo del invitado, que es
+ * donde suele estar la postura.
+ */
+const DESVANECIDO_BASE = 0.12;
+
 export type ResultadoPlaca =
   | { ok: true; png: Buffer }
   | { ok: false; motivo: string };
@@ -111,6 +124,7 @@ export async function armarPlaca(
       // con la referencia pero el resultado es una cabeza gigante, porque el
       // alto ocupado no es lo mismo que el encuadre. El README de `placas/`
       // ya lo decía; esto lo confirma.
+      desvanecidoBase: DESVANECIDO_BASE,
       ...(opciones.escalaSujeto !== undefined ? { escalaSujeto: opciones.escalaSujeto } : {}),
     });
     return { ok: true, png: await renderizar(datos, LIENZO, retrato) };
