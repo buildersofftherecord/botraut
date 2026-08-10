@@ -71,6 +71,22 @@ const DESVANECIDO_BASE = 0.12;
 const ESCALA_SUJETO = 1.3;
 
 /**
+ * Curva de tonos del invitado. `prepararRetrato` usa 1.35 por defecto.
+ *
+ * A 1.35 el torso quedaba en luminancia ~7 sobre un fondo de ~9: la persona era
+ * **más oscura que lo que la rodea**, así que no tenía silueta ni hombros y se
+ * leía como una cabeza flotando, pegada encima del fondo en vez de integrada.
+ *
+ * A 1.8 el cuerpo aparece: se ven los hombros, la ropa y los brazos, y el
+ * invitado se apoya en la placa.
+ *
+ * Bajar el fondo en vez de levantar al invitado se probó primero y no alcanza:
+ * el piso no lo pone el mosaico sino el degradado de base del lienzo, así que
+ * atenuar la trama detrás del sujeto movió la luminancia 0.4 y nada más.
+ */
+const GAMMA_SUJETO = 1.8;
+
+/**
  * Cuánto se baja el invitado dentro de su cuadro, en fracción del alto.
  *
  * `prepararRetrato` lo ancla arriba con `top: 0` y no expone offset. Lo hace a
@@ -218,6 +234,7 @@ export async function armarPlaca(
       // alto ocupado no es lo mismo que el encuadre. El README de `placas/`
       // ya lo decía; esto lo confirma.
       desvanecidoBase: DESVANECIDO_BASE,
+      gamma: GAMMA_SUJETO,
       escalaSujeto: opciones.escalaSujeto ?? ESCALA_SUJETO,
     });
     return { ok: true, png: await renderizar(datos, LIENZO, await bajarEnElCuadro(retrato, ancho, alto)) };
