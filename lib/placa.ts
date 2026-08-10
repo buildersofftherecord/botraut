@@ -45,6 +45,19 @@ const TRANSPARENCIA_MINIMA = 0.08;
 const DESVANECIDO_BASE = 0.12;
 
 /**
+ * Cuánto ocupa el invitado, por encima del 1.15 que trae `prepararRetrato`.
+ *
+ * Ese default está calibrado para un plano de busto y deja al invitado un poco
+ * chico contra el peso del nombre. 1.3 le da presencia sin convertirlo en un
+ * primer plano: llevarlo a llenar el alto del cuadro se probó y sale una cabeza
+ * gigante.
+ *
+ * Sigue siendo un default, no una regla. El encuadre de cada foto es distinto y
+ * el agente puede subirlo o bajarlo si el humano se lo pide.
+ */
+const ESCALA_SUJETO = 1.3;
+
+/**
  * Cuánto se baja el invitado dentro de su cuadro, en fracción del alto.
  *
  * `prepararRetrato` lo ancla arriba con `top: 0` y no expone offset. Lo hace a
@@ -192,7 +205,7 @@ export async function armarPlaca(
       // alto ocupado no es lo mismo que el encuadre. El README de `placas/`
       // ya lo decía; esto lo confirma.
       desvanecidoBase: DESVANECIDO_BASE,
-      ...(opciones.escalaSujeto !== undefined ? { escalaSujeto: opciones.escalaSujeto } : {}),
+      escalaSujeto: opciones.escalaSujeto ?? ESCALA_SUJETO,
     });
     return { ok: true, png: await renderizar(datos, LIENZO, await bajarEnElCuadro(retrato, ancho, alto)) };
   } catch (e) {

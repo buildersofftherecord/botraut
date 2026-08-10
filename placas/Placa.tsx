@@ -164,7 +164,11 @@ export async function renderizarConFactor(
             bottom: l.margen + 130 * s,
             display: "flex",
             flexDirection: "column",
-            width: l.cajaAncho,
+            // Sin ancho fijo: la caja se ajusta a su contenido. Con ancho fijo
+            // había que dimensionarla para la fecha más larga, y entonces
+            // "21:00 HS" —8 caracteres— dejaba la mitad de la fila en blanco.
+            // `alignSelf: flex-start` es lo que evita que el flex la estire.
+            alignSelf: "flex-start",
             // El filete vuelve, pero a `lineaViva` y de 2px. Al alfa 0.1 y 1px
             // daba contraste 1.3:1 contra el fondo: invisible en el feed y lo
             // primero que se come la compresión de Instagram. Sin filete, las
