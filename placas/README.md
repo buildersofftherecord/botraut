@@ -75,8 +75,43 @@ arrancaba al 27% y la persona quedaba colgando.
 
 Se escala por **alto**, no por ancho. Por ancho, el tamaño final dependía de
 cuán abierto estuviera el plano de origen: con los brazos cruzados la silueta es
-ancha, se achicaba para entrar, y la persona quedaba baja. Por alto, una foto de
-busto y una de medio cuerpo llegan las dos a la misma altura de cabeza.
+ancha, se achicaba para entrar, y la persona quedaba baja.
+
+### El encuadre
+
+Escalar la silueta —por alto o por ancho— nunca alcanza, y es lo que hizo
+fracasar dos intentos anteriores. Con el mismo número, un plano de busto da una
+cabeza enorme y uno de medio cuerpo una chica, porque lo que se escala es la
+persona entera y lo que importa es la cara.
+
+Lo resuelve `encuadre.ts`, y la clave es qué se le pide al modelo: **un dato, no
+una opinión**. Un modelo con visión mide dónde está la cabeza en la foto —cuatro
+números— y la aritmética hace el resto:
+
+    escala = alto de cabeza objetivo / alto de cabeza medido
+    posición = la que hace coincidir la línea de los ojos con su objetivo
+
+El objetivo está en `OBJETIVO`, medido sobre `referencia/1x1-objetivo.jpeg` con
+el mismo modelo que mide las fotos de entrada. Medir las dos cosas con la misma
+regla es lo que hace que la comparación signifique algo.
+
+La escala sale del **alto de la cabeza** y la posición de la **línea de los
+ojos**, no de la coronilla: el pelo oscuro hace que la coronilla sea la medida
+más ruidosa entre corridas (3.6 a 4.2) y los ojos la más firme (25.5 a 25.7).
+
+Verificado con tres recortes del mismo sujeto —cabeza al 45.8%, 72.9% y 21.8%
+de la foto— que dan escalas 0.97, 0.61 y 2.04 y **la misma cara en la placa**.
+
+Dos cosas que hay que saber si tocás esto:
+
+- **Con medición, `prepararRetrato` no recorta la foto al sujeto.** Las
+  fracciones son relativas a la imagen tal como llega; recortarla adentro las
+  invalida. Ese bug existió: una foto con aire abajo pedía escala 2.04 y esa
+  escala se aplicaba a una imagen ya ajustada, o sea una cabeza gigante.
+- **Si la medición falla, no falla la placa.** `medirCara` devuelve `undefined`
+  ante red, cuota, schema o una medida incoherente, y el retrato cae en la
+  escala fija. Que no salga una placa porque se cayó una API de visión sería
+  peor que una placa con el encuadre genérico.
 
 ### Cómo se resuelve la base
 

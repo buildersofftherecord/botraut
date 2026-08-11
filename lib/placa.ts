@@ -3,6 +3,8 @@ import { validarDatos } from "../placas/datos";
 import { renderizar } from "../placas/Placa";
 import { prepararRetrato } from "../placas/primitivos/Retrato";
 import { LIENZOS, altoDeFoto } from "../placas/lienzos";
+import { encuadrar } from "../placas/encuadre";
+import { medirCara } from "./encuadre";
 
 /**
  * El único lienzo calibrado. Los otros tres existen en `placas/lienzos.ts` pero
@@ -31,18 +33,11 @@ const SUPERMUESTREO = 2;
  */
 const TRANSPARENCIA_MINIMA = 0.08;
 
-/**
- * Cuánto de la base del invitado se disuelve en el negro.
- *
- * `prepararRetrato` usa 0.28 por defecto, y existe porque el wordmark es más
- * chico que la bandera de tela de las placas originales: sin degradado, el
- * invitado queda cortado a filo contra el borde inferior.
- *
- * A 0.28 se come los brazos. Se bajó a 0.12 mirando el resultado — alcanza para
- * que el corte no se note y deja ver la mitad de abajo del invitado, que es
- * donde suele estar la postura.
+/*
+ * Acá vivía `DESVANECIDO_BASE`, que pisaba el default de `prepararRetrato`.
+ * Se eliminó: el paquete de diseño ya trae el valor correcto para este layout,
+ * y un override que repite un default es un default que se desincroniza.
  */
-const DESVANECIDO_BASE = 0.12;
 
 /**
  * Cuánto ocupa el invitado, en fracción del **alto** del cuadro.
@@ -61,11 +56,13 @@ const DESVANECIDO_BASE = 0.12;
  * Escalar por alto elimina esa dependencia: una foto de busto y una de medio
  * cuerpo llegan las dos a la misma altura de coronilla. Lo que **no** resuelve
  * es de dónde a dónde va el encuadre — un plano entero llevado al alto del
- * cuadro da una cabeza chica. Eso es criterio, y es lo que va a decidir el
- * modelo de visión que devuelve dónde está la cabeza.
+ * cuadro da una cabeza chica.
  *
- * Hasta entonces, 0.75 —el mismo default que `prepararRetrato`, y tienen que
- * seguir siendo el mismo— y el agente puede ajustarlo si el humano se lo pide.
+ * Eso lo resuelve `medirCara` + `encuadrar()`, que sacan la escala del alto de
+ * la cabeza en vez de la silueta. Este número quedó como **respaldo**: es lo
+ * que se usa cuando la medición no está disponible (red, cuota, o una foto
+ * donde el modelo no encuentra una cara). Tiene que seguir coincidiendo con el
+ * default de `prepararRetrato`.
  */
 export const ESCALA_SUJETO = 0.75;
 
@@ -89,10 +86,9 @@ const GAMMA_SUJETO = 1.8;
  * Acá vivía `BAJAR_INVITADO` (6%) con su `bajarEnElCuadro()`, que desplazaba al
  * invitado dentro de su cuadro para despegarle la cabeza del borde superior.
  *
- * Se eliminó con el layout centrado porque el desplazamiento ahora lo hace la
- * geometría: el cuadro de la foto mide el 94% del alto del lienzo y va anclado
- * abajo, así que su borde superior ya cae al 6% — exactamente donde arranca la
- * coronilla en la referencia. Mantener además el offset la bajaba al 12%.
+ * Se eliminó con el layout centrado. Ese aire ahora es `desplazamiento.y` en
+ * `prepararRetrato` (0.06), y con encuadre por visión ni siquiera se usa: la
+ * posición sale de hacer coincidir la línea de los ojos con su objetivo.
  */
 
 /**
@@ -202,17 +198,30 @@ export async function armarPlaca(
     const alto = altoDeFoto(l) * SUPERMUESTREO;
     const afilada = await realzar(foto);
 
-    const retrato = await prepararRetrato(afilada, {
+    // Se recorta al sujeto **acá**, antes de medir, y no sólo adentro de
+    // `prepararRetrato`. Las fracciones que devuelve el modelo son relativas a
+    // la imagen que ve, así que tiene que ver exactamente la misma que después
+    // se encuadra. Medir la foto con aire alrededor y aplicar el resultado
+    // sobre la recortada daría una cara corrida. `trim` sobre una imagen ya
+    // recortada no hace nada, así que la segunda pasada es gratis.
+    const alSujeto = await sharp(afilada).ensureAlpha().trim({ threshold: 1 }).png().toBuffer();
+
+    const medida = await medirCara(alSujeto);
+    const encuadre = medida ? encuadrar(medida) : undefined;
+
+    const retrato = await prepararRetrato(alSujeto, {
       ancho,
       alto,
-      // Sin default propio: el 1.15 de `prepararRetrato` está calibrado para
-      // un plano de busto y funciona para la mayoría. Calcular la escala para
-      // que la silueta llene el alto se probó y da peor: el número coincide
-      // con la referencia pero el resultado es una cabeza gigante, porque el
-      // alto ocupado no es lo mismo que el encuadre. El README de `placas/`
-      // ya lo decía; esto lo confirma.
       gamma: GAMMA_SUJETO,
-      escalaSujeto: opciones.escalaSujeto ?? ESCALA_SUJETO,
+      // Prioridad: lo que pidió el humano, después lo que midió el modelo, y
+      // al final el default fijo. El humano gana porque "salió muy grande" es
+      // una corrección sobre lo que ya vio; el modelo gana sobre el default
+      // porque midió esta foto en vez de asumir un plano de busto.
+      escalaSujeto: opciones.escalaSujeto ?? encuadre?.escalaSujeto ?? ESCALA_SUJETO,
+      // La posición viene de la medición aunque el humano haya pisado la
+      // escala: son dos cosas distintas. Pisando sólo el tamaño, la cara crece
+      // alrededor de la línea de los ojos en vez de irse para arriba.
+      cara: encuadre?.cara,
     });
     return { ok: true, png: await renderizar(datos, LIENZO, retrato) };
   } catch (e) {

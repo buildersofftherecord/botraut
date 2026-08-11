@@ -92,20 +92,65 @@ export type OpcionesRetrato = {
    * nombre se apoya sobre el pecho a propósito— y por eso el desvanecido
    * empieza más arriba en vez de cortar seco.
    *
-   * 0.74 del cuadro es el 76% del lienzo, que es donde arranca el rol. El
-   * cuadro empieza al 6% del lienzo, de ahí la conversión.
+   * 0.76 es donde arranca el rol. Ahora el cuadro **es** el lienzo, así que la
+   * fracción es directa y no hay que convertirla — antes el cuadro medía el 94%
+   * y este número era 0.74, con la conversión escrita a mano.
    */
   pisoTexto?: number;
+  /**
+   * Dónde se apoya la esquina superior izquierda del sujeto, en fracciones del
+   * cuadro. `y` es el aire arriba de la coronilla; `x` se suma al centrado.
+   *
+   * El 0.06 de `y` es el aire que antes daba `PROPORCION_ALTO_FOTO = 0.94` en
+   * `lienzos.ts`. Se movió acá porque es una decisión de dónde va la cara, no
+   * del tamaño del cuadro — y teniéndolo acá, el cuadro puede ser el lienzo
+   * entero y desaparece la conversión entre dos sistemas de fracciones.
+   *
+   * Lo pisa `cara` cuando hay medición.
+   */
+  desplazamiento?: { x: number; y: number };
+  /**
+   * Encuadre por medición: dónde está la cara en la foto y dónde tiene que
+   * quedar en el cuadro, todo en fracciones.
+   *
+   * Cuando está, manda sobre `desplazamiento`: la posición sale de hacer
+   * coincidir la línea de los ojos con su objetivo, en vez de dejar un aire
+   * fijo arriba. Es la diferencia entre "todas las fotos arrancan al 6%" y
+   * "todas las caras quedan en el mismo lugar" — que no es lo mismo, porque el
+   * pelo mide distinto en cada persona.
+   *
+   * Lo calcula `encuadrar()` en `../encuadre.ts` a partir de lo que midió el
+   * modelo de visión. Sin medición no viene, y el retrato cae en el
+   * `desplazamiento` fijo, que siempre produce algo publicable.
+   */
+  cara?: { ojos: number; centro: number; ojosEn: number; centroEn: number };
 };
 
 export async function prepararRetrato(
   entrada: Buffer,
-  { ancho, alto, escalaSujeto = 0.75, gamma = 1.35, desvanecido = 0.06, desvanecidoBase = 0.15, pisoTexto = 0.74 }: OpcionesRetrato,
+  { ancho, alto, escalaSujeto = 0.75, gamma = 1.35, desvanecido = 0.06,
+    desvanecidoBase = 0.15,
+    pisoTexto = 0.76,
+    desplazamiento = { x: 0, y: 0.06 },
+    cara,
+  }: OpcionesRetrato,
 ): Promise<Buffer> {
   // 1. Recorte al sujeto. `trim` sobre el alfa saca el aire que dejó el
   //    recortador, que si no se cuenta como parte de la foto y descentra todo
   //    el encuadre — el sujeto termina corrido y más chico de lo pedido.
-  const alSujeto = await sharp(entrada).ensureAlpha().trim({ threshold: 1 }).png().toBuffer();
+  //
+  //    **Salvo que haya medición.** Las fracciones de `cara` son relativas a la
+  //    imagen tal como llega, así que recortarla acá las invalida: el sujeto se
+  //    mueve y se agranda, pero los números siguen apuntando a donde estaba la
+  //    cara antes. Con una foto con mucho aire abajo eso daba una escala de 2
+  //    aplicada a una imagen ya ajustada, o sea una cabeza gigante cortada.
+  //
+  //    Quien mide es responsable de medir sobre lo que manda. Si ya venía
+  //    recortada, este `trim` no haría nada igual; si no venía, saltearlo es
+  //    justamente lo que mantiene los dos en el mismo sistema de coordenadas.
+  const alSujeto = cara
+    ? await sharp(entrada).ensureAlpha().png().toBuffer()
+    : await sharp(entrada).ensureAlpha().trim({ threshold: 1 }).png().toBuffer();
 
   // 2. Escala por alto. El ancho se deriva para no deformar; que sobre ancho
   //    respecto del cuadro se resuelve recortando en el pegado, no estirando.
@@ -119,37 +164,59 @@ export async function prepararRetrato(
   const m = await sharp(escalado).metadata();
   const anchoSujeto = m.width ?? ancho;
 
-  // 3. Pegado al cuadro: **centrado** en horizontal y anclado arriba.
+  // 3. Pegado al cuadro.
   //
-  //    Arriba, no abajo. Anclado al piso el invitado queda colgando: medido, la
-  //    cara arrancaba al 27% del alto de la placa contra el 6% de la
-  //    referencia. Anclado arriba la coronilla llega donde tiene que llegar y
-  //    el torso se va por el borde inferior, que es donde el nombre se le apoya
-  //    encima.
+  //    Dónde va la esquina superior izquierda del sujeto. Con medición sale de
+  //    hacer coincidir la línea de los ojos y el centro de la cara con su
+  //    objetivo; sin medición, del desplazamiento fijo sobre el centrado.
   //
-  //    Lo que sobra se recorta antes de pegar, no se pega con offset negativo:
-  //    `composite` de sharp sólo acepta offsets positivos, así que el desborde
-  //    se resuelve con `extract`. Se recorta por igual de los dos lados para
-  //    que el centro del sujeto siga siendo el centro del cuadro.
-  const anchoVisible = Math.min(anchoSujeto, ancho);
-  const altoVisible = Math.min(altoSujeto, alto);
-  const visible =
-    anchoVisible === anchoSujeto && altoVisible === altoSujeto
-      ? escalado
-      : await sharp(escalado)
-          .extract({
-            left: Math.round((anchoSujeto - anchoVisible) / 2),
-            top: 0,
-            width: anchoVisible,
-            height: altoVisible,
-          })
-          .png()
-          .toBuffer();
+  //    Arriba, no abajo, en los dos casos. Anclado al piso el invitado queda
+  //    colgando: medido, la cara arrancaba al 27% del alto de la placa contra
+  //    el 6% de la referencia.
+  const destino = cara
+    ? {
+        x: Math.round(cara.centroEn * ancho - cara.centro * anchoSujeto),
+        y: Math.round(cara.ojosEn * alto - cara.ojos * altoSujeto),
+      }
+    : {
+        x: Math.round((ancho - anchoSujeto) / 2 + desplazamiento.x * ancho),
+        y: Math.round(desplazamiento.y * alto),
+      };
+
+  //    `composite` de sharp sólo acepta offsets positivos, así que un destino
+  //    negativo —el sujeto sale por arriba o por la izquierda— se resuelve
+  //    recortando con `extract` antes de pegar, no pegando corrido.
+  const recorte = {
+    left: Math.max(0, -destino.x),
+    top: Math.max(0, -destino.y),
+  };
+  const anchoVisible = Math.min(anchoSujeto - recorte.left, ancho - Math.max(0, destino.x));
+  const altoVisible = Math.min(altoSujeto - recorte.top, alto - Math.max(0, destino.y));
+
+  // El sujeto puede quedar entero fuera del cuadro si la medición fue absurda.
+  // Devolver el cuadro vacío es feo pero publicable; `extract` con alto o ancho
+  // cero tira, y eso mataría el handler.
+  if (anchoVisible <= 0 || altoVisible <= 0) {
+    return sharp({
+      create: { width: ancho, height: alto, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    })
+      .png()
+      .toBuffer();
+  }
+
+  const sinRecorte =
+    recorte.left === 0 && recorte.top === 0 && anchoVisible === anchoSujeto && altoVisible === altoSujeto;
+  const visible = sinRecorte
+    ? escalado
+    : await sharp(escalado)
+        .extract({ ...recorte, width: anchoVisible, height: altoVisible })
+        .png()
+        .toBuffer();
 
   const cuadro = await sharp({
     create: { width: ancho, height: alto, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
   })
-    .composite([{ input: visible, left: Math.round((ancho - anchoVisible) / 2), top: 0 }])
+    .composite([{ input: visible, left: Math.max(0, destino.x), top: Math.max(0, destino.y) }])
     .png()
     .toBuffer();
 
@@ -204,7 +271,8 @@ export async function prepararRetrato(
     // La línea del texto, porque si el sujeto **pasa** de ahí, el rol y la
     // barra quedan sobre el torso. Anclado sólo al sujeto, esta protección se
     // movía con `escalaSujeto` y desaparecía cuando el agente la subía.
-    const piso = Math.min(altoVisible, Math.round(alto * pisoTexto));
+    const bordeDelSujeto = Math.max(0, destino.y) + altoVisible;
+    const piso = Math.min(bordeDelSujeto, Math.round(alto * pisoTexto));
     const largo = Math.round(alto * desvanecidoBase);
     const desde = Math.max(0, piso - largo);
     salida = await sharp(salida)

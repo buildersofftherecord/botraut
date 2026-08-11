@@ -81,11 +81,19 @@ export function anchoContenido(lienzo: Lienzo): number {
 }
 
 /**
- * La silueta no llega al alto completo del lienzo: queda por debajo del borde
- * superior para que el HUD respire. En la referencia la coronilla arranca al
- * 6% del alto, y de ahí sale el 0.94.
+ * El cuadro de la foto es **todo el lienzo**.
+ *
+ * Estuvo en 0.94 para dejar aire arriba de la coronilla, y ese aire ahora lo
+ * pone `desplazamiento.y` en `prepararRetrato`, que es donde corresponde: es
+ * una decisión de dónde va la cara, no del tamaño del cuadro.
+ *
+ * La razón de fondo es que el encuadre por visión trabaja en fracciones —"los
+ * ojos van al 25.7% del alto"— y con un cuadro más chico que el lienzo cada
+ * fracción hay que convertirla entre los dos sistemas. Esa conversión ya se
+ * escribió a mano en un test como `(0.7 - 0.06) / 0.94`. Con el cuadro igual al
+ * lienzo no hay dos sistemas.
  */
-const PROPORCION_ALTO_FOTO = 0.94;
+const PROPORCION_ALTO_FOTO = 1;
 
 /**
  * A qué alto real se lleva el cuadro de la foto en un lienzo dado.

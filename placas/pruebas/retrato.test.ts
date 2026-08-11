@@ -22,7 +22,111 @@ async function alfaEnFila(retrato: Buffer, fraccionDelCuadro: number): Promise<n
   return suma / n / 255;
 }
 
-const PISO = 0.74;
+const PISO = 0.76;
+
+/**
+ * Una foto de prueba: gris opaco con una fila blanca en `marcaEn`.
+ *
+ * Sintética a propósito. Para verificar *dónde queda* la cara no hace falta una
+ * cara — hace falta un punto que se pueda encontrar sin ambigüedad en la
+ * salida, y una franja blanca lo es. Usar una foto real obligaría a detectar
+ * ojos para comprobar el resultado, o sea a meter el modelo dentro del test que
+ * verifica la aritmética que existe para no depender del modelo.
+ */
+async function fotoConMarca(ancho: number, alto: number, marcaEn: number): Promise<Buffer> {
+  const fila = Math.round(alto * marcaEn);
+  const pixeles = Buffer.alloc(ancho * alto * 4);
+  for (let y = 0; y < alto; y++) {
+    const gris = Math.abs(y - fila) <= 2 ? 255 : 60;
+    for (let x = 0; x < ancho; x++) {
+      const i = (y * ancho + x) * 4;
+      pixeles[i] = pixeles[i + 1] = pixeles[i + 2] = gris;
+      pixeles[i + 3] = 255;
+    }
+  }
+  return sharp(pixeles, { raw: { width: ancho, height: alto, channels: 4 } }).png().toBuffer();
+}
+
+/** En qué fracción del alto quedó la fila más clara. */
+async function filaMasClara(cuadro: Buffer): Promise<number> {
+  const { data, info } = await sharp(cuadro).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  let mejor = 0;
+  let mejorY = 0;
+  for (let y = 0; y < info.height; y++) {
+    const i = (y * info.width + Math.round(info.width / 2)) * 4;
+    const v = data[i] * (data[i + 3] / 255);
+    if (v > mejor) {
+      mejor = v;
+      mejorY = y;
+    }
+  }
+  return mejorY / info.height;
+}
+
+describe("prepararRetrato — dónde queda la cara", () => {
+  const OJOS_EN = 0.257;
+  const sinDesvanecidos = { desvanecido: 0, desvanecidoBase: 0 } as const;
+
+  /**
+   * La propiedad completa, de punta a punta: **tres fotos con la cara en
+   * lugares y tamaños distintos tienen que dejar la cara en el mismo lugar del
+   * lienzo**.
+   *
+   * Es lo que dos intentos anteriores no lograron, los dos derivando la escala
+   * de estadísticas de la silueta —alto ocupado, ancho de la cabeza—. Una
+   * silueta con los brazos cruzados y un primer plano dan números parecidos y
+   * encuadres opuestos. Acá el dato es semántico y viene de afuera.
+   */
+  it.each([
+    ["cara arriba y chica", 0.18, 0.6],
+    ["cara al medio", 0.4, 1.0],
+    ["cara abajo y grande", 0.62, 1.9],
+  ])("con %s deja los ojos en el objetivo", async (_caso, ojosEnLaFoto, escalaSujeto) => {
+    const foto = await fotoConMarca(600, 900, ojosEnLaFoto);
+
+    const cuadro = await prepararRetrato(foto, {
+      ancho: ANCHO,
+      alto: ALTO,
+      escalaSujeto,
+      cara: { ojos: ojosEnLaFoto, centro: 0.5, ojosEn: OJOS_EN, centroEn: 0.5 },
+      ...sinDesvanecidos,
+    });
+
+    expect(await filaMasClara(cuadro)).toBeCloseTo(OJOS_EN, 2);
+  }, 30_000);
+
+  /**
+   * Con medición, `prepararRetrato` **no** puede recortar la foto al sujeto: las
+   * fracciones de `cara` son relativas a la imagen tal como llega, y recortarla
+   * las invalida.
+   *
+   * Esto salió de una prueba real. Con una foto con mucho aire abajo, el modelo
+   * midió la cabeza al 21.8% y pidió escala 2.04; adentro el `trim` la dejaba
+   * ajustada al sujeto y esa escala se aplicaba a una imagen donde la cabeza ya
+   * ocupaba el 46%. Resultado: una cabeza gigante y cortada.
+   */
+  it("no recorta la foto cuando las coordenadas vienen de afuera", async () => {
+    const conAire = await sharp({
+      create: { width: 600, height: 1600, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    })
+      .composite([{ input: await fotoConMarca(600, 800, 0.3), left: 0, top: 0 }])
+      .png()
+      .toBuffer();
+
+    // La marca está al 30% de los 800px útiles, que sobre los 1600 del archivo
+    // es el 15%. Si adentro recortara el aire, la marca volvería al 30% y la
+    // fila terminaría muy por debajo del objetivo.
+    const cuadro = await prepararRetrato(conAire, {
+      ancho: ANCHO,
+      alto: ALTO,
+      escalaSujeto: 0.9,
+      cara: { ojos: 0.15, centro: 0.5, ojosEn: OJOS_EN, centroEn: 0.5 },
+      ...sinDesvanecidos,
+    });
+
+    expect(await filaMasClara(cuadro)).toBeCloseTo(OJOS_EN, 2);
+  }, 30_000);
+});
 
 describe("prepararRetrato — el piso del texto", () => {
   /**
@@ -69,9 +173,9 @@ describe("prepararRetrato — el piso del texto", () => {
       ancho: ANCHO,
       alto: ALTO,
     });
-    // 70% del lienzo, convertido a fracción del cuadro (que arranca al 6%).
-    const dondeVaElNombre = (0.7 - 0.06) / 0.94;
-    expect(await alfaEnFila(retrato, dondeVaElNombre)).toBeGreaterThan(0.2);
+    // Sin conversión: el cuadro es el lienzo, así que 0.70 del cuadro es 0.70
+    // del lienzo, que es donde cae el nombre.
+    expect(await alfaEnFila(retrato, 0.7)).toBeGreaterThan(0.2);
   }, 30_000);
 
   /**

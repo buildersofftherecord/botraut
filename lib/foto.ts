@@ -2,7 +2,6 @@ import sharp from "sharp";
 import { recortar } from "./recorte";
 import { recortarASilueta, type Silueta } from "./silueta";
 import { mirarSilueta, type Veredicto } from "./mirar";
-import { LIENZOS, altoDeFoto } from "../placas/lienzos";
 import { LADO_MINIMO, type Foto } from "./tipos";
 
 /**
@@ -30,8 +29,27 @@ import { LADO_MINIMO, type Foto } from "./tipos";
  * El grano y la curva de negros de `prepararRetrato` disimulan bastante el
  * escalado a tamaño de Instagram; el README de `placas/` lo dice explícito.
  */
-const AUMENTO_MAXIMO = 2.1;
-export const ALTO_MINIMO_SILUETA = Math.round(altoDeFoto(LIENZOS["1:1"]) / AUMENTO_MAXIMO);
+/**
+ * Alto mínimo de la silueta recortada, en px.
+ *
+ * **Literal, no derivado de `altoDeFoto`.** Lo estuvo, como
+ * `altoDeFoto / 2.1`, y eso lo hacía moverse por razones que no tienen que ver
+ * con la calidad de la imagen: cuando el cuadro de la foto pasó del 94% del
+ * lienzo al 100% —un cambio de sistema de coordenadas, no de resolución de
+ * salida— el piso saltó de 483 a 514 y empezó a rechazar la foto de muestra del
+ * propio sistema. La placa entregada mide 1080 en los dos casos.
+ *
+ * El ancla es la placa aprobada: `placas/muestra/gr.png` deja una silueta de
+ * 505px de alto y produce `placa-actual.png`, que es el diseño aprobado. Un
+ * piso que rechace esa foto está mal por definición, así que 505 es el techo
+ * duro de este número. 483 deja algo de margen abajo.
+ *
+ * Con el encuadre por visión este piso es un proxy más grueso que antes: cuánto
+ * se agranda la foto ya no es fijo, depende de cuánta cara haya en ella —una
+ * foto cerrada se agranda menos, una abierta más—. Sigue sirviendo para
+ * descartar lo evidentemente chico, que es para lo que está.
+ */
+export const ALTO_MINIMO_SILUETA = 483;
 
 export type ResultadoValidacion =
   | { ok: true; foto: Pick<Foto, "ancho" | "alto"> }
