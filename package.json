@@ -7,7 +7,6 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
-    "placa": "tsx scripts/placa.tsx",
     "test:placas": "cd placas && vitest run",
     "test:todo": "npm test && npm run test:placas"
   },
@@ -15,11 +14,9 @@
   "dependencies": {
     "@ai-sdk/google": "^4.0.33",
     "@chat-adapter/slack": "^4.36.0",
-    "@chat-adapter/state-memory": "^4.36.0",
     "@chat-adapter/state-redis": "^4.36.0",
     "@imgly/background-removal-node": "^1.4.5",
     "@shuding/opentype.js": "1.4.0-beta.0",
-    "@vercel/blob": "^2.6.1",
     "@vercel/og": "^0.11.1",
     "ai": "^7.0.50",
     "chat": "^4.36.0",

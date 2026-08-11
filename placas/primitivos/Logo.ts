@@ -8,7 +8,7 @@ const aca = dirname(fileURLToPath(import.meta.url));
 /**
  * Carga `botr-wordmark-neg.svg` y le baja el wordmark a gris.
  *
- * Se recolorea al vuelo en vez de editar el archivo porque el SVG de `marca/`
+ * Se recolorea al vuelo en vez de editar el archivo porque el SVG de `marca/` (el directorio de assets de este paquete)
  * es el primitivo de marca tal como sale de la fuente: si alguien lo abre para
  * usarlo en otro lado tiene que encontrar el logo, no nuestra variante para
  * placas. La versión gris es una aplicación, no el logo.

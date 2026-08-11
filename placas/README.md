@@ -184,7 +184,7 @@ buffer y no JSX, y por eso la foto llega ya en B/N.
 
 **3. Los tokens no se re-derivan a ojo.** Salen de
 `landing/app/globals.css`, o de medir las placas originales en
-`../botraut/marca/referencia/`. Que la placa y el sitio compartan los mismos
+`referencia/`. Que la placa y el sitio compartan los mismos
 valores es lo que los hace un sistema y no dos cosas parecidas. Cada excepción
 está comentada en `tokens.ts` con su medición al lado — incluida la más grande,
 que es la tipografía display.
@@ -340,5 +340,5 @@ nombre del programa.
   silueta. Falta probarlo con una segunda foto real.
 - **Los lienzos que no son 1:1 están sin calibrar.** Los números de `4:5`,
   `9:16` y `16:9` en `lienzos.ts` son un punto de partida, no valores medidos.
-- **No hay tests.** Los de `botraut/marca/` cubren la versión anterior de este
+- ~~No hay tests.~~ Ya hay 54, en `pruebas/`. Los de la versión anterior de este
   template y no se portaron.

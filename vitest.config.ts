@@ -10,7 +10,7 @@ import { defineConfig } from "vitest/config";
  *     archivo lo usa (`lib/bot.ts` ya no tiene JSX).
  *   - `react` para el template, porque Satori consume elementos de React
  *
- * Los archivos de `marca/` llevan `@jsxImportSource react` como pragma en la
+ * Los archivos de `placas/` llevan `@jsxImportSource react` como pragma en la
  * primera línea. Sin eso, Satori recibe elementos del runtime del Chat SDK y
  * el render falla con un error que no dice nada.
  */
