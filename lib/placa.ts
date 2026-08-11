@@ -67,7 +67,7 @@ const DESVANECIDO_BASE = 0.12;
  * Hasta entonces, 0.75 —el mismo default que `prepararRetrato`, y tienen que
  * seguir siendo el mismo— y el agente puede ajustarlo si el humano se lo pide.
  */
-const ESCALA_SUJETO = 0.75;
+export const ESCALA_SUJETO = 0.75;
 
 /**
  * Curva de tonos del invitado. `prepararRetrato` usa 1.35 por defecto.
@@ -211,7 +211,6 @@ export async function armarPlaca(
       // con la referencia pero el resultado es una cabeza gigante, porque el
       // alto ocupado no es lo mismo que el encuadre. El README de `placas/`
       // ya lo decía; esto lo confirma.
-      desvanecidoBase: DESVANECIDO_BASE,
       gamma: GAMMA_SUJETO,
       escalaSujeto: opciones.escalaSujeto ?? ESCALA_SUJETO,
     });

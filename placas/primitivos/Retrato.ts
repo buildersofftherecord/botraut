@@ -76,11 +76,31 @@ export type OpcionesRetrato = {
    * cualquier escala, y esa línea es exactamente lo que delata el recorte.
    */
   desvanecidoBase?: number;
+  /**
+   * A partir de qué fracción del cuadro el sujeto tiene que ser **totalmente
+   * transparente**, pase lo que pase con la escala.
+   *
+   * Existe porque el desvanecido solo no alcanza. Estaba anclado al borde
+   * inferior del sujeto, así que su posición se movía con `escalaSujeto`: a
+   * 0.75 el cuerpo estaba disuelto donde cae el rol (alfa 1%) y a 1.15 estaba
+   * entero (alfa 85%), con el rol y la fecha ilegibles encima. El agente puede
+   * cambiar la escala, así que la legibilidad del texto no puede depender de
+   * ella.
+   *
+   * Esto es un dato del **layout**, no de la foto: abajo de esta línea van el
+   * rol, la barra y el wordmark, y ahí no puede haber nada. Arriba sí —el
+   * nombre se apoya sobre el pecho a propósito— y por eso el desvanecido
+   * empieza más arriba en vez de cortar seco.
+   *
+   * 0.74 del cuadro es el 76% del lienzo, que es donde arranca el rol. El
+   * cuadro empieza al 6% del lienzo, de ahí la conversión.
+   */
+  pisoTexto?: number;
 };
 
 export async function prepararRetrato(
   entrada: Buffer,
-  { ancho, alto, escalaSujeto = 0.75, gamma = 1.35, desvanecido = 0.06, desvanecidoBase = 0.3 }: OpcionesRetrato,
+  { ancho, alto, escalaSujeto = 0.75, gamma = 1.35, desvanecido = 0.06, desvanecidoBase = 0.15, pisoTexto = 0.74 }: OpcionesRetrato,
 ): Promise<Buffer> {
   // 1. Recorte al sujeto. `trim` sobre el alfa saca el aire que dejó el
   //    recortador, que si no se cuenta como parte de la foto y descentra todo
@@ -174,21 +194,31 @@ export async function prepararRetrato(
   }
 
   if (desvanecidoBase > 0) {
-    // El degradado va anclado al **borde inferior del sujeto**, no al del
-    // cuadro. Salvo que la persona llegue justo al piso, entre las dos hay
-    // transparencia, y un degradado desde el piso del cuadro se gasta entero
-    // sobre esa nada: el canto de la foto queda intacto más arriba.
+    // Dónde termina el desvanecido: el más alto entre el borde inferior del
+    // sujeto y la línea del texto.
+    //
+    // El borde del sujeto, porque si la persona no llega al piso, entre las dos
+    // hay transparencia y un degradado desde el piso del cuadro se gasta entero
+    // sobre esa nada — el canto de la foto queda intacto más arriba.
+    //
+    // La línea del texto, porque si el sujeto **pasa** de ahí, el rol y la
+    // barra quedan sobre el torso. Anclado sólo al sujeto, esta protección se
+    // movía con `escalaSujeto` y desaparecía cuando el agente la subía.
+    const piso = Math.min(altoVisible, Math.round(alto * pisoTexto));
     const largo = Math.round(alto * desvanecidoBase);
-    const desde = Math.max(0, altoVisible - largo);
+    const desde = Math.max(0, piso - largo);
     salida = await sharp(salida)
       .composite([
         {
           input: envolver(
-            `<linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0" y1="${altoVisible}" x2="0" y2="${desde}">
+            // Abajo de `piso` no se pinta nada: en `dest-in`, lo que la máscara
+            // no cubre queda transparente. Ese es el corte duro que garantiza
+            // el negro debajo del texto.
+            `<linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0" y1="${piso}" x2="0" y2="${desde}">
                <stop offset="0" stop-color="#fff" stop-opacity="0"/>
                <stop offset="1" stop-color="#fff" stop-opacity="1"/>
              </linearGradient>
-             <rect x="0" y="${desde}" width="100%" height="${altoVisible - desde}" fill="url(#g)"/>
+             <rect x="0" y="${desde}" width="100%" height="${piso - desde}" fill="url(#g)"/>
              <rect x="0" y="0" width="100%" height="${desde}" fill="#fff"/>`,
           ),
           blend: "dest-in",

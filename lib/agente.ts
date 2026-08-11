@@ -3,6 +3,7 @@ import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import { buscarCopy } from "./buscar";
 import { generarPlaca } from "./generar";
+import { ESCALA_SUJETO } from "./placa";
 import { InvitadoSchema } from "./tipos";
 import { NO_ENCONTRADO } from "./mensajes";
 import { EstadoThreadSchema } from "./estado";
@@ -102,13 +103,19 @@ export function crearHerramientas(conv: Conversacion) {
         fecha: z.string().describe('Como lo dijo el humano, por ejemplo "jueves 6 de agosto"'),
         hora: z.string().describe('Por ejemplo "21:00 hs"'),
         enVivo: z.boolean(),
+        // El rango y el default se derivan de `ESCALA_SUJETO`, no se escriben
+        // acá. Escritos a mano quedaron en el rango viejo —0.8 a 2.2, cuando
+        // la escala era fracción del ancho— y el default nuevo (0.75, del
+        // alto) caía por debajo del mínimo. El agente mandó 1.15 leyendo esta
+        // descripción y el invitado salió al 115% del alto del cuadro, con el
+        // rol y la fecha encima del torso.
         escala: z
           .number()
-          .min(0.8)
-          .max(2.2)
+          .min(ESCALA_SUJETO * 0.7)
+          .max(ESCALA_SUJETO * 1.8)
           .optional()
           .describe(
-            "Cuánto ocupa el invitado. Por defecto 1.15, calibrado para un plano de busto. " +
+            `Qué fracción del ALTO del cuadro ocupa el invitado. Por defecto ${ESCALA_SUJETO}. ` +
               "Subilo si el humano dice que salió chico, bajalo si dice que salió muy grande. " +
               "No lo mandes si no te lo pidieron.",
           ),
