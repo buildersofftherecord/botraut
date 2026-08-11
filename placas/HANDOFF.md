@@ -39,7 +39,7 @@ const datos = validarDatos(jsonCrudo);
 //    El ×2 es el supermuestreo; no lo saques.
 const l = LIENZOS["1:1"];
 const foto = await prepararRetrato(bufferDeLaFoto, {
-  ancho: Math.round(l.ancho * l.fotoAncho * 2),
+  ancho: l.ancho * 2,
   alto: altoDeFoto(l) * 2,
 });
 
@@ -63,7 +63,7 @@ Datos válidos:
 ```
 
 Todo llega ya formateado y en mayúsculas. El template no interpreta fechas ni
-traduce nada. `fecha` y `hora` no pueden pasar de 23 caracteres: la caja de datos
+traduce nada. `fecha` y `hora` no pueden pasar de 23 caracteres: la barra de datos
 tiene ancho fijo.
 
 ## Tres límites duros

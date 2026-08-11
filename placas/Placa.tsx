@@ -5,13 +5,14 @@ import { fileURLToPath } from "node:url";
 import { ImageResponse } from "@vercel/og";
 import sharp from "sharp";
 import { cargarFuentes } from "./fuentes/index";
-import { LIENZOS, type Lienzo, type NombreLienzo } from "./lienzos";
+import { LIENZOS, anchoContenido, altoDeFoto, type Lienzo, type NombreLienzo } from "./lienzos";
 import { COLOR, NOMBRE_COLOR, FUENTE, HUD } from "./tokens";
 import { Etiqueta, PuntoRec } from "./primitivos/Hud";
 import { IconoCalendario, IconoReloj, IconoSenal } from "./primitivos/Iconos";
 import { generarFijo, rutaFijo } from "./primitivos/Fijo";
+import { cargarLogo } from "./primitivos/Logo";
 import { etiquetaInvitado, type DatosPlaca } from "./datos";
-import { tamanoNombre, NOMBRE_LETTER_SPACING_EM } from "./medirNombre";
+import { maquetarNombre, NOMBRE_LETTER_SPACING_EM } from "./medirNombre";
 
 /**
  * Satori antialiasa a 1x y los bordes de la tipografía display quedan
@@ -30,6 +31,36 @@ import { tamanoNombre, NOMBRE_LETTER_SPACING_EM } from "./medirNombre";
 export const SUPERMUESTREO = 2;
 
 const aca = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Separación vertical entre las piezas del pie, en px nominales.
+ *
+ * El pie es una sola columna centrada anclada abajo —nombre, rol, barra,
+ * wordmark— y estos son los aires entre sus piezas. Están juntos acá y no
+ * repartidos por el JSX porque el ritmo vertical se elige mirándolos como
+ * serie, no de a uno.
+ *
+ * `pie` es el aire debajo del wordmark. Es mayor que el `margen` del HUD a
+ * propósito: ópticamente un bloque apoyado sobre el borde inferior necesita
+ * más aire abajo que arriba, o se lee cayéndose de la placa. En la referencia
+ * quedó en 44 y ahí se ve apretado.
+ */
+const AIRE = { rol: 30, barra: 34, logo: 38, pie: 56 } as const;
+
+/**
+ * Geometría interna de la barra de datos, en px nominales.
+ *
+ * Exportada porque `pruebas/datos.test.ts` la usa para calcular cuánto texto
+ * entra en el campo de la fecha, y de ahí sale `MAX_CARACTERES_FILA`. Antes
+ * esos números estaban escritos a mano en el test, copiados del JSX: cualquier
+ * cambio de padding acá dejaba el test midiendo una caja que ya no existía, y
+ * el límite de caracteres quedaba mal sin que nada fallara.
+ *
+ * `separacion` es el aire a cada lado del filete que separa dos grupos. Sale
+ * duplicado en el render (gap del flex + margen del filete) y por eso el
+ * presupuesto lo cuenta dos veces.
+ */
+export const BARRA = { padding: 20, gap: 12, icono: 22, filete: 1, punto: 8, gapPunto: 10, borde: 2 } as const;
 
 export async function renderizarConFactor(
   datos: DatosPlaca,
@@ -52,18 +83,29 @@ export async function renderizarConFactor(
     ancho: nominal.ancho * s,
     alto: nominal.alto * s,
     margen: nominal.margen * s,
+    contenidoMargen: nominal.contenidoMargen * s,
     logoAncho: nominal.logoAncho * s,
-    cajaAncho: nominal.cajaAncho * s,
     nombreTamano: nominal.nombreTamano * s,
+    nombreMinimo: nominal.nombreMinimo * s,
     rolTamano: nominal.rolTamano * s,
+    barraAlto: nominal.barraAlto * s,
   };
 
-  const anchoColumna = l.ancho * (1 - l.fotoAncho) - l.margen - 40 * s;
-  const [fijo, fuentes, tamanoDelNombre] = await Promise.all([
+  // El nombre se mide contra el **mismo** ancho que ocupa la barra de datos.
+  // Que compartan la medida es lo que hace que el pie lea como un bloque.
+  const anchoCont = anchoContenido(l);
+  const [fijo, logo, fuentes, nombre] = await Promise.all([
     cargarFijo(nombreLienzo, factor, ajustes),
+    cargarLogo(),
     cargarFuentes(),
-    tamanoNombre(datos.invitado.nombre, anchoColumna, l.nombreTamano),
+    maquetarNombre(datos.invitado.nombre, anchoCont, l.nombreTamano, l.nombreMinimo),
   ]);
+
+  const filas = [
+    { icono: <IconoCalendario escala={s} />, texto: datos.fecha, vivo: false },
+    { icono: <IconoReloj escala={s} />, texto: datos.hora, vivo: false },
+    { icono: <IconoSenal escala={s} />, texto: "EN VIVO", vivo: datos.enVivo },
+  ];
 
   const respuesta = new ImageResponse(
     (
@@ -77,141 +119,157 @@ export async function renderizarConFactor(
           fontFamily: FUENTE.mono,
         }}
       >
-        {/* La capa fija: fondo + REC + timecode + logo, ya horneada. Ver
-            primitivos/Fijo.tsx y `npm run hornear`. */}
+        {/* La capa fija: fondo + REC + timecode, ya horneada. Ver
+            primitivos/Fijo.tsx y `npm run hornear`. El wordmark ya **no** está
+            acá: ver el bloque del pie más abajo. */}
         <img
           src={`data:image/png;base64,${fijo.toString("base64")}`}
           style={{ position: "absolute", top: 0, left: 0, width: l.ancho, height: l.alto }}
         />
 
-        {/* La foto: a sangre derecha, cortada abajo. Llega ya recortada y en
-            B/N — Satori no soporta `filter`, así que toda transformación de
-            imagen pasa por sharp antes de llegar acá. */}
+        {/* El invitado: centrado, a todo el ancho, sangrando por abajo.
+            Llega ya recortado y en B/N — Satori no soporta `filter`, así que
+            toda transformación de imagen pasa por sharp antes de llegar acá.
+
+            Va **debajo** del pie en el árbol: el nombre se le apoya encima del
+            torso, y esa superposición es lo que ancla a la persona a la placa.
+            Es la razón por la que no hace falta ningún objeto tapando la base. */}
         {fotoPng ? (
           <img
             src={`data:image/png;base64,${fotoPng.toString("base64")}`}
             style={{
               position: "absolute",
-              right: 0,
+              left: 0,
               bottom: 0,
-              width: l.ancho * l.fotoAncho,
-              height: l.alto * 0.94,
+              width: l.ancho,
+              height: altoDeFoto(l),
               objectFit: "cover",
               objectPosition: "top center",
             }}
           />
         ) : null}
 
-        {/* Columna izquierda: etiqueta, nombre, rol */}
+        {/* El pie: una sola columna centrada, anclada abajo. Nombre, rol,
+            barra y wordmark comparten eje y —nombre y barra— ancho. */}
         <div
           style={{
             position: "absolute",
-            top: l.margen + 130 * s,
-            left: l.margen + 28 * s,
-            width: anchoColumna,
+            left: 0,
+            bottom: 0,
+            width: l.ancho,
+            paddingBottom: AIRE.pie * s,
             display: "flex",
             flexDirection: "column",
+            alignItems: "center",
           }}
         >
-          <Etiqueta escala={s}>{etiquetaInvitado(datos.invitado.genero)}</Etiqueta>
-
           <div
             style={{
               display: "flex",
-              width: 140 * s,
-              height: 1 * s,
-              background: COLOR.lineaViva,
-              marginTop: 14 * s,
-              marginBottom: 34 * s,
-            }}
-          />
-
-          <div
-            style={{
-              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
               fontFamily: FUENTE.display,
-              fontSize: tamanoDelNombre,
-              lineHeight: 0.92,
+              fontSize: nombre.tamano,
+              lineHeight: 0.94,
               letterSpacing: `${NOMBRE_LETTER_SPACING_EM}em`,
               textTransform: "uppercase",
               color: NOMBRE_COLOR,
             }}
           >
-            {datos.invitado.nombre}
+            {/* Una línea por elemento en vez de dejar que Satori envuelva: el
+                corte lo elige `maquetarNombre` midiendo con la fuente real,
+                para que las dos líneas queden parejas de ancho. */}
+            {nombre.lineas.map((linea, i) => (
+              <div key={i} style={{ display: "flex" }}>{linea}</div>
+            ))}
           </div>
 
           <div
             style={{
               display: "flex",
+              marginTop: AIRE.rol * s,
+              maxWidth: anchoCont,
               fontFamily: FUENTE.mono,
               fontSize: l.rolTamano,
-              lineHeight: 1.5,
+              lineHeight: 1.45,
+              textAlign: "center",
               color: COLOR.rol,
-              marginTop: 30 * s,
             }}
           >
             {datos.invitado.rol}
           </div>
-        </div>
 
-        {/* Caja de datos, abajo a la izquierda. Ancho fijo y siempre tres
-            filas — ver `cajaAncho` en lienzos.ts. Que su geometría no dependa
-            de los datos es lo que permite hornear el marco en la capa fija. */}
-        <div
-          style={{
-            position: "absolute",
-            left: l.margen + 28 * s,
-            bottom: l.margen + 130 * s,
-            display: "flex",
-            flexDirection: "column",
-            // Sin ancho fijo: la caja se ajusta a su contenido. Con ancho fijo
-            // había que dimensionarla para la fecha más larga, y entonces
-            // "21:00 HS" —8 caracteres— dejaba la mitad de la fila en blanco.
-            // `alignSelf: flex-start` es lo que evita que el flex la estire.
-            alignSelf: "flex-start",
-            // El filete vuelve, pero a `lineaViva` y de 2px. Al alfa 0.1 y 1px
-            // daba contraste 1.3:1 contra el fondo: invisible en el feed y lo
-            // primero que se come la compresión de Instagram. Sin filete, las
-            // tres filas quedan flotando sin contención.
-            border: `${2 * s}px solid ${COLOR.lineaViva}`,
-            padding: `${40 * s}px ${34 * s}px`,
-            gap: 34 * s,
-          }}
-        >
-          {[
-            { icono: <IconoCalendario escala={s} />, texto: datos.fecha, vivo: false },
-            { icono: <IconoReloj escala={s} />, texto: datos.hora, vivo: false },
-            { icono: <IconoSenal escala={s} />, texto: "EN VIVO", vivo: true },
-          ].map((fila, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 20 * s }}>
-              {fila.icono}
-              <div style={{ display: "flex", width: 1 * s, height: 24 * s, background: COLOR.linea }} />
-              <div style={{ display: "flex", alignItems: "center", gap: 10 * s }}>
-                {fila.vivo ? <PuntoRec tamano={8} escala={s} /> : null}
-                <Etiqueta color={COLOR.datos} escala={s} tamano={HUD.datosTamano}>{fila.texto}</Etiqueta>
+          {/* La barra de datos: una sola fila a todo el ancho de contenido.
+              Reemplaza a la caja apilada de tres filas. No es sólo compactar:
+              una franja horizontal al pie lee como un lower third de
+              transmisión, que es la idea que el REC y el timecode venían
+              insinuando sin comprometerse.
+
+              El marco tiene ancho fijo y los grupos se reparten con
+              `space-between`, así que una fecha más larga mueve las
+              separaciones internas pero **no** la geometría de la barra. Eso
+              es lo que hace que la placa sea el mismo template todas las
+              semanas. */}
+          <div
+            style={{
+              display: "flex",
+              marginTop: AIRE.barra * s,
+              width: anchoCont,
+              height: l.barraAlto,
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingLeft: BARRA.padding * s,
+              paddingRight: BARRA.padding * s,
+              // El filete va a `lineaViva` y 2px. Al alfa 0.1 y 1px daba
+              // contraste 1.3:1 contra el fondo: invisible en el feed y lo
+              // primero que se come la compresión de Instagram.
+              border: `${BARRA.borde * s}px solid ${COLOR.lineaViva}`,
+            }}
+          >
+            {filas.map((fila, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: BARRA.gap * s }}>
+                {/* Un solo separador por grupo, y va **entre** grupos.
+                    La caja apilada llevaba además uno corto entre el ícono y su
+                    dato: en tres filas apiladas eso ordenaba, pero en una franja
+                    de una línea son cinco filetes verticales en 824px y se lee
+                    como una tabla. Además cada uno cuesta ancho, y el ancho es
+                    justo lo que escasea acá: los tres campos ahora comparten la
+                    barra en vez de tener una fila cada uno. */}
+                {i > 0 ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      width: BARRA.filete * s,
+                      height: l.barraAlto * 0.5,
+                      background: COLOR.linea,
+                      marginRight: BARRA.gap * s,
+                    }}
+                  />
+                ) : null}
+                {fila.icono}
+                <div style={{ display: "flex", alignItems: "center", gap: BARRA.gapPunto * s }}>
+                  {fila.vivo ? <PuntoRec tamano={BARRA.punto} escala={s} /> : null}
+                  <Etiqueta color={COLOR.datos} escala={s} tamano={HUD.datosTamano}>
+                    {fila.texto}
+                  </Etiqueta>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+
+          {/* El wordmark, centrado al pie.
+
+              Salió de la capa fija cuando el invitado se centró. Horneado
+              estaba abajo a la derecha, donde el retrato ya se había
+              desvanecido; centrado cae justo sobre el torso, y horneado
+              quedaría **detrás** de la foto. Acá va después de la foto en el
+              árbol, así que la superposición está garantizada por el orden y
+              no por que el desvanecido llegue. Cuesta milisegundos: es un SVG. */}
+          <img
+            src={`data:image/svg+xml;base64,${logo.toString("base64")}`}
+            style={{ marginTop: AIRE.logo * s, width: l.logoAncho }}
+          />
         </div>
-
-        {/* Acá iba el lema "[ BUILDERS TALKING TO BUILDERS ]", centrado sobre el
-            borde inferior, y se sacó.
-
-            Está en **una sola** de las cinco placas originales (Veiras), y ahí
-            no flota: va encerrada entre los dos corchetes inferiores del marco
-            HUD. Al sacar los esquineros, la leyenda perdió el marco que la
-            sostenía y quedaba sola en medio de un borde vacío.
-
-            Además repetía: con el wordmark justo arriba, "BUILDERS" aparecía
-            tres veces en el quinto inferior de la placa. E iba al 55% de
-            opacidad contra el 10% del borde de la caja de datos — la
-            decoración se veía cinco veces más que el dato del evento.
-
-            Sin ella el pie lee como dos bloques: datos a la izquierda, marca a
-            la derecha. Si alguna vez va algo ahí, el camino es el de la placa
-            de Nahuel — "NO FILTER / ALL REAL" chico y a la izquierda, que dice
-            algo en vez de repetir el nombre del programa. */}
-
       </div>
     ),
     { width: l.ancho, height: l.alto, fonts: fuentes },

@@ -33,30 +33,9 @@ export async function generarFondo(ancho: number, alto: number): Promise<Buffer>
            x="0" y="0" width="${lado}" height="${lado}" opacity="${FONDO.opacidad}"/>
   </pattern>`;
 
-  // La trama se atenúa en las dos columnas donde hay contenido, y respira sólo
-  // en el medio.
-  //
-  // A la izquierda, sobre el nombre. A la derecha, detrás del invitado: ahí el
-  // mosaico levantaba el fondo a luminancia ~9 mientras el torso queda en ~7,
-  // así que la persona resultaba **más oscura que lo que la rodea** y se leía
-  // flotando, recortada y pegada encima. Con el fondo en negro el sujeto se
-  // despega solo, sin tocarle la exposición.
-  //
-  // `#333` en vez de negro pleno: no la apaga del todo, la baja a un quinto.
-  const mascara = FONDO.atenuarNombre
-    ? `<linearGradient id="franja" x1="0" x2="1">
-         <stop offset="0.06" stop-color="#333"/>
-         <stop offset="0.40" stop-color="#fff"/>
-         <stop offset="0.46" stop-color="#fff"/>
-         <stop offset="0.60" stop-color="#2a2a2a"/>
-       </linearGradient>
-       <mask id="atenuar"><rect width="100%" height="100%" fill="url(#franja)"/></mask>`
-    : "";
-
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${ancho}" height="${alto}">
     <defs>
       ${patron}
-      ${mascara}
       <linearGradient id="base" x1="0" y1="0" x2="0.8" y2="1">
         <stop offset="0" stop-color="${COLOR.negro}"/>
         <stop offset="1" stop-color="${COLOR.carbon}"/>
@@ -72,7 +51,7 @@ export async function generarFondo(ancho: number, alto: number): Promise<Buffer>
     </defs>
     <rect width="100%" height="100%" fill="${COLOR.negro}"/>
     <rect width="100%" height="100%" fill="url(#base)"/>
-    <rect width="100%" height="100%" fill="url(#mono)"${FONDO.atenuarNombre ? ' mask="url(#atenuar)"' : ""}/>
+    <rect width="100%" height="100%" fill="url(#mono)"/>
     <rect width="100%" height="100%" filter="url(#grano)" opacity="${FONDO.grano}"/>
     <rect width="100%" height="100%" fill="url(#vin)"/>
   </svg>`;

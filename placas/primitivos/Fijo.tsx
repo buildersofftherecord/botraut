@@ -6,13 +6,12 @@ import { LIENZOS, type Lienzo, type NombreLienzo } from "../lienzos";
 import { COLOR, FUENTE } from "../tokens";
 import { Etiqueta, PuntoRec } from "./Hud";
 import { generarFondo } from "./Fondo";
-import { cargarLogo } from "./Logo";
 
 /**
  * La capa fija: todo lo que es idéntico en todas las placas.
  *
- * Fondo (degradado + monograma + grano + viñeta), `REC ●`, el timecode y el
- * wordmark de abajo a la derecha. Nada de esto depende del invitado.
+ * Fondo (degradado + monograma + grano + viñeta), `REC ●` y el timecode. Nada
+ * de esto depende del invitado.
  *
  * Existe por dos razones:
  *
@@ -22,22 +21,21 @@ import { cargarLogo } from "./Logo";
  * 2. **Es la marca.** Horneada, un agente que arma placas no puede tocarla sin
  *    querer: recibe un PNG y compone encima.
  *
- * ── Por qué el logo entra acá ──
+ * ── Por qué el wordmark ya NO entra acá ──
  *
- * El logo va abajo a la derecha, encima de donde está la foto del invitado, así
- * que debería ir *después* de la foto en el árbol. Se verificó que no hace
- * falta: renderizando el logo debajo de la foto la placa sale **idéntica al
- * píxel**, porque `desvanecidoBase` en `Retrato.ts` deja esa zona
- * completamente transparente.
+ * Estuvo horneado mientras iba abajo a la derecha: ahí el retrato ya se había
+ * desvanecido, así que daba igual que el logo se dibujara antes que la foto —
+ * se verificó que la placa salía idéntica al píxel.
  *
- * Eso es un acoplamiento real y hay que saberlo: **si alguna vez el retrato
- * deja de desvanecerse en la base, el logo queda tapado por la foto** y hay que
- * sacarlo de esta capa. El test de la capa fija no lo detecta; lo detecta el
- * golden file de la placa entera.
+ * Con el layout centrado eso deja de valer. El wordmark va centrado al pie,
+ * justo donde está el torso del invitado, y horneado quedaría **tapado por la
+ * foto**. Se movió a `Placa.tsx`, después de la foto en el árbol, donde la
+ * superposición la garantiza el orden y no una coincidencia del desvanecido.
  *
  * ── Qué NO entra ──
  *
- * La caja de datos, aunque su marco y sus íconos sean invariantes. Partirla
+ * El wordmark, por lo de arriba. Y la barra de datos, aunque su marco y sus
+ * íconos sean invariantes. Partirla
  * —marco horneado, texto encima— obligaría a que las dos capas calcularan la
  * misma geometría por separado, y eso se desincroniza en el primer cambio de
  * padding. Renderizarla entera cuesta milisegundos. No vale el acoplamiento.
@@ -55,11 +53,7 @@ export async function generarFijo(
   const alto = nominal.alto * s;
   const margen = nominal.margen * s;
 
-  const [fondo, logo, fuentes] = await Promise.all([
-    generarFondo(ancho, alto),
-    cargarLogo(),
-    cargarFuentes(),
-  ]);
+  const [fondo, fuentes] = await Promise.all([generarFondo(ancho, alto), cargarFuentes()]);
 
   const respuesta = new ImageResponse(
     (
@@ -83,7 +77,7 @@ export async function generarFijo(
           style={{
             position: "absolute",
             top: margen + 8 * s,
-            left: margen + 28 * s,
+            left: margen + 14 * s,
             display: "flex",
             alignItems: "center",
             gap: 10 * s,
@@ -101,23 +95,13 @@ export async function generarFijo(
           style={{
             position: "absolute",
             top: margen + 8 * s,
-            right: margen + 28 * s,
+            right: margen + 14 * s,
             display: "flex",
           }}
         >
           <Etiqueta escala={s}>00:00:07:21</Etiqueta>
         </div>
 
-        {/* El wordmark, gris y sin placa. Ver primitivos/Logo.ts. */}
-        <img
-          src={`data:image/svg+xml;base64,${logo.toString("base64")}`}
-          style={{
-            position: "absolute",
-            right: margen + 20 * s,
-            bottom: margen + 34 * s,
-            width: nominal.logoAncho * s,
-          }}
-        />
       </div>
     ),
     { width: ancho, height: alto, fonts: fuentes },

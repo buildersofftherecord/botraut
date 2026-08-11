@@ -46,26 +46,95 @@ export async function anchoTexto(texto: string, fontSize: number): Promise<numbe
   });
 }
 
+/** Cómo queda maquetado el nombre: en qué líneas se parte y a qué cuerpo. */
+export type NombreMaquetado = {
+  /** Una entrada por línea, ya partida por palabras. */
+  lineas: string[];
+  /** Cuerpo en px, el mayor que hace entrar la línea más ancha. */
+  tamano: number;
+};
+
 /**
- * Satori no corta una palabra a mitad de línea: si la palabra más larga del
- * nombre no entra en el ancho disponible al tamaño de diseño, sigue de
- * largo más allá del contenedor en vez de ajustarse (así se descubrió el
- * bug original con "Guillermo Rauch" y, después, con nombres acentuados
- * como "José María Muñoz" — un promedio de ancho de glyph por caracter no
- * distingue una M de una I, ni una Ñ de una N). Por eso el tamaño real es
- * dinámico: el más grande que hace entrar, medida con la fuente real, la
- * palabra *más ancha en píxeles* del nombre (no la de más caracteres), sin
- * superar el techo de diseño `tamanoMax`.
+ * El cuerpo más grande al que `lineas` entra en `anchoDisponible`, sin pasar
+ * el techo. Mide con la fuente real (el `hmtx` de Anton), no con un promedio
+ * de ancho por carácter: ese promedio no distingue una M de una I ni una Ñ de
+ * una N, y así se escapó el bug original con "José María Muñoz".
  */
-export async function tamanoNombre(
-  nombre: string,
+async function cuerpoQueEntra(
+  lineas: string[],
   anchoDisponible: number,
   tamanoMax: number,
 ): Promise<number> {
-  const anchosPorPunto = await Promise.all(
-    nombre.split(" ").map((palabra) => anchoTexto(palabra, 1)),
-  );
-  const anchoPorPuntoMasAncho = Math.max(...anchosPorPunto);
-  const maximoQueEntra = anchoDisponible / anchoPorPuntoMasAncho;
-  return Math.min(tamanoMax, Math.floor(maximoQueEntra));
+  const anchosPorPunto = await Promise.all(lineas.map((linea) => anchoTexto(linea, 1)));
+  const masAncha = Math.max(...anchosPorPunto);
+  return Math.min(tamanoMax, Math.floor(anchoDisponible / masAncha));
+}
+
+/**
+ * Parte el nombre en dos líneas por el corte que deja las dos más parejas.
+ *
+ * Parejas por **ancho en píxeles**, no por cantidad de palabras ni de letras:
+ * lo que decide el cuerpo final es la línea más ancha, así que el mejor corte
+ * es el que minimiza ese máximo.
+ */
+async function partirEnDos(palabras: string[]): Promise<string[] | undefined> {
+  if (palabras.length < 2) return undefined;
+
+  let mejor: string[] | undefined;
+  let mejorMaximo = Infinity;
+  for (let i = 1; i < palabras.length; i++) {
+    const arriba = palabras.slice(0, i).join(" ");
+    const abajo = palabras.slice(i).join(" ");
+    const maximo = Math.max(await anchoTexto(arriba, 1), await anchoTexto(abajo, 1));
+    if (maximo < mejorMaximo) {
+      mejorMaximo = maximo;
+      mejor = [arriba, abajo];
+    }
+  }
+  return mejor;
+}
+
+/**
+ * Cómo maquetar el nombre del invitado.
+ *
+ * **Una línea es el diseño.** La placa de referencia pone "GUILLERMO RAUCH"
+ * entero de lado a lado, y esa horizontal larga es la que sostiene el pie de
+ * la placa. Partirlo en dos cuando entra en una es romper el diseño.
+ *
+ * Se parte en dos sólo cuando una línea caería por debajo de `tamanoMinimo`,
+ * y el motivo no es legibilidad —a 83px se lee perfecto— sino **forma**: un
+ * nombre de 24 caracteres estirado sobre los 824px queda como una cinta fina
+ * y deja de leerse como titular.
+ *
+ * Un nombre de una sola palabra nunca se parte: no hay dónde. Si no entra,
+ * entra chico, que es la única salida honesta.
+ *
+ * Medido sobre los 824px del 1:1 con `tamanoMinimo` 100:
+ *
+ *   GUILLERMO RAUCH          124 → una línea
+ *   FRANCISCO VEIRAS         125 → una línea
+ *   MARIA JOSE GONZALEZ      101 → una línea, justo
+ *   JUAN CRUZ FERNANDEZ RUIZ  83 → dos líneas, a 101
+ */
+export async function maquetarNombre(
+  nombre: string,
+  anchoDisponible: number,
+  tamanoMax: number,
+  tamanoMinimo: number,
+): Promise<NombreMaquetado> {
+  const enUnaLinea = [nombre];
+  const tamanoUnaLinea = await cuerpoQueEntra(enUnaLinea, anchoDisponible, tamanoMax);
+  if (tamanoUnaLinea >= tamanoMinimo) return { lineas: enUnaLinea, tamano: tamanoUnaLinea };
+
+  const partido = await partirEnDos(nombre.split(" ").filter(Boolean));
+  if (!partido) return { lineas: enUnaLinea, tamano: tamanoUnaLinea };
+
+  const tamanoPartido = await cuerpoQueEntra(partido, anchoDisponible, tamanoMax);
+
+  // Sólo si partir realmente mejora. Con dos palabras muy desparejas
+  // —"JUAN BAUTISTAAAAA X"— la línea larga manda igual y el corte no compra
+  // nada, salvo una línea suelta de una palabra.
+  return tamanoPartido > tamanoUnaLinea
+    ? { lineas: partido, tamano: tamanoPartido }
+    : { lineas: enUnaLinea, tamano: tamanoUnaLinea };
 }

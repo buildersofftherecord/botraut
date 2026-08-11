@@ -45,30 +45,29 @@ const TRANSPARENCIA_MINIMA = 0.08;
 const DESVANECIDO_BASE = 0.12;
 
 /**
- * Cuánto ocupa el invitado, por encima del 1.15 que trae `prepararRetrato`.
+ * Cuánto ocupa el invitado, en fracción del **alto** del cuadro.
  *
- * Ese default está calibrado para un plano de busto y deja al invitado un poco
- * chico contra el peso del nombre. 1.3 le da presencia sin convertirlo en un
- * primer plano: llevarlo a llenar el alto del cuadro se probó y sale una cabeza
- * gigante.
+ * Cambió de unidad con el layout centrado: antes `prepararRetrato` escalaba por
+ * ancho y este número era 1.3. Por ancho, el tamaño final dependía de cuán
+ * abierto estuviera el plano de origen —brazos cruzados, silueta ancha, persona
+ * chica—, que es el problema que se intentó tapar dos veces con heurísticas y
+ * las dos salieron peor:
  *
- * Sigue siendo un default, no una regla. El encuadre de cada foto es distinto y
- * el agente puede subirlo o bajarlo si el humano se lo pide.
+ * - Escalando para llenar el alto del cuadro *desde el escalado por ancho*: el
+ *   número coincidía con la referencia pero salía una cabeza gigante.
+ * - Normalizando por el ancho de la cabeza: la medida agarra el pelo, que en un
+ *   peinado angosto infla la escala y termina cortando la cabeza.
  *
- * Se intentó calcularlo dos veces y las dos salieron peor:
+ * Escalar por alto elimina esa dependencia: una foto de busto y una de medio
+ * cuerpo llegan las dos a la misma altura de coronilla. Lo que **no** resuelve
+ * es de dónde a dónde va el encuadre — un plano entero llevado al alto del
+ * cuadro da una cabeza chica. Eso es criterio, y es lo que va a decidir el
+ * modelo de visión que devuelve dónde está la cabeza.
  *
- * - Escalando para que la silueta llene el alto del cuadro: el número
- *   coincidía con la referencia pero salía una cabeza gigante, porque el alto
- *   ocupado no es lo mismo que el encuadre.
- * - Normalizando por el ancho de la cabeza, para compensar cuánto cuerpo hay
- *   en cuadro: la medida agarra el pelo, que en un peinado angosto infla la
- *   escala y termina cortando la cabeza.
- *
- * 1.3 fijo funciona en las dos fotos de prueba, con encuadres distintos. Si
- * alguna vez falla, el camino no es un tercer heurístico sino que el agente lo
- * ajuste, que es lo que ya puede hacer.
+ * Hasta entonces, 0.75 —el mismo default que `prepararRetrato`, y tienen que
+ * seguir siendo el mismo— y el agente puede ajustarlo si el humano se lo pide.
  */
-const ESCALA_SUJETO = 1.3;
+const ESCALA_SUJETO = 0.75;
 
 /**
  * Curva de tonos del invitado. `prepararRetrato` usa 1.35 por defecto.
@@ -86,39 +85,15 @@ const ESCALA_SUJETO = 1.3;
  */
 const GAMMA_SUJETO = 1.8;
 
-/**
- * Cuánto se baja el invitado dentro de su cuadro, en fracción del alto.
+/*
+ * Acá vivía `BAJAR_INVITADO` (6%) con su `bajarEnElCuadro()`, que desplazaba al
+ * invitado dentro de su cuadro para despegarle la cabeza del borde superior.
  *
- * `prepararRetrato` lo ancla arriba con `top: 0` y no expone offset. Lo hace a
- * propósito y está documentado: anclado al piso, la cara arrancaba al 27% del
- * alto contra el 12-17% de las cinco placas originales, y el invitado quedaba
- * colgando.
- *
- * El 6% despega la cabeza del borde superior sin volver a ese problema. Se
- * eligió comparando renders (0%, 3%, 6% y 10%), no por teoría.
- *
- * Lo que se va por abajo se recorta, pero ahí está el degradado de la base, así
- * que no aparece un corte duro.
+ * Se eliminó con el layout centrado porque el desplazamiento ahora lo hace la
+ * geometría: el cuadro de la foto mide el 94% del alto del lienzo y va anclado
+ * abajo, así que su borde superior ya cae al 6% — exactamente donde arranca la
+ * coronilla en la referencia. Mantener además el offset la bajaba al 12%.
  */
-const BAJAR_INVITADO = 0.06;
-
-/** Desplaza el retrato hacia abajo dentro de su cuadro, sin cambiarle el tamaño. */
-async function bajarEnElCuadro(retrato: Buffer, ancho: number, alto: number): Promise<Buffer> {
-  const bajar = Math.round(alto * BAJAR_INVITADO);
-  if (bajar <= 0) return retrato;
-
-  const recortado = await sharp(retrato)
-    .extract({ left: 0, top: 0, width: ancho, height: alto - bajar })
-    .png()
-    .toBuffer();
-
-  return sharp({
-    create: { width: ancho, height: alto, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
-  })
-    .composite([{ input: recortado, left: 0, top: bajar }])
-    .png()
-    .toBuffer();
-}
 
 /**
  * Le saca a la foto la definición que ya tiene, antes de que el pipeline la
@@ -220,7 +195,10 @@ export async function armarPlaca(
 
   try {
     const l = LIENZOS[LIENZO];
-    const ancho = Math.round(l.ancho * l.fotoAncho * SUPERMUESTREO);
+    // El cuadro de la foto es **todo el ancho** del lienzo. Antes era una
+    // columna a la derecha (`ancho * fotoAncho`); con el layout centrado el
+    // invitado es el elemento dominante y ocupa el cuadro entero.
+    const ancho = l.ancho * SUPERMUESTREO;
     const alto = altoDeFoto(l) * SUPERMUESTREO;
     const afilada = await realzar(foto);
 
@@ -237,7 +215,7 @@ export async function armarPlaca(
       gamma: GAMMA_SUJETO,
       escalaSujeto: opciones.escalaSujeto ?? ESCALA_SUJETO,
     });
-    return { ok: true, png: await renderizar(datos, LIENZO, await bajarEnElCuadro(retrato, ancho, alto)) };
+    return { ok: true, png: await renderizar(datos, LIENZO, retrato) };
   } catch (e) {
     // Acá se corta cualquier texto técnico: lo que devuelve esta función lo
     // repite el agente en el canal.

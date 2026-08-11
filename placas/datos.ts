@@ -21,30 +21,31 @@ import { z } from "zod";
  */
 
 /**
- * Cuántos caracteres entran en una fila de la caja de datos.
+ * Cuántos caracteres entran en el campo de la fecha de la barra de datos.
  *
- * Sale de la geometría, no de un número redondo: la caja mide `cajaAncho` 480px
- * y le quedan **347px** de texto después del ícono (22), los dos gaps (20+20),
- * el separador (1), el padding (34×2) y el borde (1×2). IBM Plex Mono a 20px
- * avanza 12px por carácter, más 3.2px del tracking del HUD = 15.2px, salvo el
- * último que no lleva tracking. 23 caracteres son 346.4px y 24 son 361.6.
+ * Sale de la geometría, no de un número redondo. La barra mide `anchoContenido`
+ * (824px en el 1:1) y los tres campos la comparten: descontados el padding, el
+ * borde, los dos filetes separadores, los tres íconos y los grupos de hora y
+ * "EN VIVO" —que son de largo conocido—, al campo de la fecha le quedan ~383px.
+ * IBM Plex Mono a `HUD.datosTamano` (21) avanza 12.6px por carácter más 3.36 de
+ * tracking: 23 caracteres son 364px y 24 son 380.
  *
- * Estuvo en 22 hasta que `pruebas/datos.test.ts` lo midió con la fuente real:
- * yo había calculado el presupuesto a partir de `"JUEVES 30 DE SEPTIEMBRE"` y
- * después derivado el límite de ese mismo número, que es circular. El caso peor
- * real —ese mismo string, de 23 caracteres— entra exacto.
+ * El caso peor real es `"JUEVES 30 DE SEPTIEMBRE"` —el programa es siempre un
+ * jueves— y mide exactamente 23. Que entre no es casualidad: `datosTamano` se
+ * eligió como el cuerpo más grande que lo hace entrar.
  *
- * Si cambiás `cajaAncho`, `HUD.labelTamano` o el padding de la caja, ese test
- * falla y hay que recalcular esto.
+ * `pruebas/datos.test.ts` recalcula este presupuesto **importando** la
+ * geometría de `Placa.tsx`, no copiándola. Antes estaba copiada a mano y
+ * cambiar el padding del JSX dejaba el límite mal sin que nada fallara.
  */
 export const MAX_CARACTERES_FILA = 23;
 
 /**
- * El techo del nombre no es tipográfico: `tamanoNombre()` achica la fuente
- * hasta que la palabra más ancha entre en la columna, así que un nombre largo
- * *entra* — pero entra chico y deja de leerse como titular. 24 caracteres es
- * donde "GUILLERMO RAUCH" todavía manda y "MAXIMILIANO ETCHECOPAR" ya está en
- * el borde.
+ * El techo del nombre no es tipográfico: `maquetarNombre()` achica la fuente
+ * hasta que entre, y si ni así entra lo parte en dos líneas — así que un nombre
+ * largo *entra*. El problema es cómo entra: pasados los ~24 caracteres deja de
+ * leerse como titular. 24 es donde "GUILLERMO RAUCH" todavía manda holgado y
+ * "JUAN CRUZ FERNANDEZ RUIZ" ya necesita las dos líneas.
  */
 export const InvitadoSchema = z.object({
   nombre: z
@@ -56,7 +57,7 @@ export const InvitadoSchema = z.object({
     .string({ error: "Falta el rol. Sin él la placa sale con un hueco debajo del nombre." })
     .trim()
     .min(1, "Falta el rol. Sin él la placa sale con un hueco debajo del nombre.")
-    .max(70, "El rol no puede pasar de 70 caracteres: arriba de eso empuja la caja de datos."),
+    .max(70, "El rol no puede pasar de 70 caracteres: arriba de eso se va a tres líneas y empuja la barra de datos."),
   genero: z.enum(["f", "m", "x"], {
     message: 'El género tiene que ser "f", "m" o "x" — decide si la etiqueta dice INVITADA, INVITADO o INVITADX.',
   }),

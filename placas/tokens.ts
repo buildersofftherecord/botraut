@@ -71,19 +71,22 @@ export const HUD = {
    * único de la placa que alguien tiene que poder leer para actuar, y a 20px
    * quedaba en 7pt sobre el ancho real del feed.
    *
-   * 23 y no más, y el techo no lo fija el gusto: lo fija el contenido.
+   * 21 y no más, y el techo no lo fija el gusto: lo fija el contenido.
    *
    * La fecha más larga que el sistema acepta es "JUEVES 30 DE SEPTIEMBRE", 23
-   * caracteres, y tiene que entrar en una línea. La caja no puede pasar de
-   * 550px sin montarse sobre la foto. Con esas dos restricciones, 23 es el
-   * cuerpo más grande posible: a 24 la fecha de septiembre ya no entra.
+   * caracteres, y tiene que entrar en una línea. Con la barra de 824px, sus
+   * paddings y los otros dos campos compartiendo la misma fila, al campo de la
+   * fecha le quedan ~383px. A 21 ocupa 364 y entra; a 22 pide 381 y queda a
+   * menos de 3px del borde, que no es holgura sino suerte.
    *
-   * La crítica de diseño pedía 34-38 para que fuera legible en el feed. Ese
-   * número es incompatible con las dos restricciones de arriba — a 28 sólo
-   * entran 19 caracteres. Si hiciera falta más cuerpo, habría que abreviar la
-   * fecha o mover la caja, no forzar el tamaño.
+   * Bajó de 23 al pasar de caja apilada a franja. No es una regresión de
+   * legibilidad: antes cada campo tenía su propia fila de 480px y ahora los
+   * tres comparten 824. Lo que se compró a cambio es que la fecha, la hora y el
+   * "EN VIVO" se lean de un saque en una horizontal, en vez de en tres saltos.
+   * `pruebas/datos.test.ts` mide este presupuesto con la fuente real y falla si
+   * alguien mueve el padding, el gap o este número.
    */
-  datosTamano: 23,
+  datosTamano: 21,
   labelTracking: "0.16em",
 } as const;
 
@@ -105,24 +108,28 @@ export const FUENTE = {
  * Reemplaza a la lluvia de ceros y unos que usaban las placas viejas. Los
  * números salen de comparar renders reales, no de teoría:
  *
- * - `opacidad: 0.02` — al 10% las bandas BO/TR cruzan por el nombre y le comen
- *   el peso; al 2% solo asoma en las zonas oscuras y se lee como ruido de
- *   compresión. Estuvo en 0.03 y se bajó mirando placas reales en Slack: a ese
- *   valor la trama competía de más con la foto del invitado.
- * - `columnas: 6` — a 10 columnas deja de reconocerse "BOTR" y el punto de
- *   usar el logo se pierde.
- * - `atenuarNombre` — la trama baja sobre el tercio izquierdo. La curva está
- *   medida sobre las cinco placas de referencia: entre el 12% y el 37% del
- *   ancho son negro limpio, porque ahí va el nombre.
+ * - `opacidad: 0.03` — estuvo en 0.02 mientras el nombre iba en la columna
+ *   izquierda: ahí la trama tenía que desaparecer para no comerle peso al
+ *   titular, y a 0.02 sólo asomaba como ruido de compresión. Con el layout
+ *   centrado el nombre se apoya sobre el torso del invitado, no sobre el
+ *   fondo, así que la trama puede leerse de verdad — y leyéndose es lo que
+ *   evita que el negro quede plano.
+ * - `columnas: 5` — a 10 columnas deja de reconocerse "BOTR" y el punto de
+ *   usar el logo se pierde. Bajó de 6 a 5 junto con la opacidad: si la trama
+ *   se va a ver, el monograma tiene que ser legible como monograma.
+ *
+ * Acá había un `atenuarNombre` que bajaba la trama sobre el tercio izquierdo,
+ * donde iba el nombre, y sobre el derecho, detrás del invitado. Se eliminó con
+ * el layout centrado: las dos zonas que protegía ya no existen, y una máscara
+ * que oscurece los costados de una composición simétrica sólo la desbalancea.
  *
  * El asset trae el punto rojo del monograma, así que el fondo reparte
  * `COLOR.rojo` por toda la placa sin que haya que pintarlo aparte.
  */
 export const FONDO = {
   monograma: "botr-monograma-cuadrado-sin-placa-neg.svg",
-  opacidad: 0.02,
-  columnas: 6,
-  atenuarNombre: true,
+  opacidad: 0.03,
+  columnas: 5,
   /** Alfa del grano de `.tv-overlay`, mismo feTurbulence que la landing. */
   grano: 0.055,
   /** Cuánto negro come la viñeta en las esquinas. */

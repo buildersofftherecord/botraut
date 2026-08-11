@@ -30,7 +30,14 @@ const lienzo = (flag("lienzo") ?? "1:1") as NombreLienzo;
  * cabeza en vez de una persona, y 0.95 lo dejaba chico y perdido. Depende del
  * encuadre de la foto de origen, no del diseño, y por eso es un flag.
  */
-const escalaSujeto = Number(flag("escala") ?? 1.15);
+/**
+ * Sin default propio: si no se pasa `--escala`, se manda `undefined` y decide
+ * `prepararRetrato`. Tener acá un número copiado del suyo ya rompió una vez —
+ * el CLI quedó en 1.15 (la escala vieja, por ancho) cuando la función pasó a
+ * 0.75 por alto, y el golden file se regeneró con un encuadre que el bot nunca
+ * produce. Un default duplicado es un default que se desincroniza.
+ */
+const escalaSujeto = flag("escala") !== undefined ? Number(flag("escala")) : undefined;
 
 if (!(lienzo in LIENZOS)) {
   console.error(`Lienzo desconocido: ${lienzo}. Opciones: ${Object.keys(LIENZOS).join(", ")}`);
@@ -56,7 +63,7 @@ const l = LIENZOS[lienzo];
  */
 const foto = rutaFoto
   ? await prepararRetrato(await readFile(rutaFoto), {
-      ancho: Math.round(l.ancho * l.fotoAncho * 2),
+      ancho: l.ancho * 2,
       alto: altoDeFoto(l) * 2,
       escalaSujeto,
     })

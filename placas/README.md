@@ -57,35 +57,49 @@ vive acá.
 
 Dos cosas que importan:
 
-- **`--escala`** (default 1.15) es cuánto del ancho del cuadro ocupa el
-  invitado. Depende del encuadre de la foto de origen, no del diseño, y por eso
-  es un flag. Con la foto de muestra: 1.45 agrandaba tanto al invitado que se
-  leía una cabeza en vez de una persona, 0.95 lo dejaba chico y perdido, 1.15
-  lo pone del tamaño que tiene en las originales.
+- **`--escala`** (default 0.75) es cuánto del **alto** del cuadro ocupa el
+  invitado. Sin el flag, el CLI no manda nada y decide `prepararRetrato`: tener
+  acá un default copiado del suyo ya rompió el golden file una vez. Depende del
+  encuadre de la foto de origen, no del diseño, y por eso es un flag. Con la
+  foto de muestra: 0.85 sube la cabeza y el nombre le cruza el brazo, 0.65 lo
+  deja flotando en el aire de arriba, 0.75 lo pone donde va.
 - **Cuanto más grande la foto, mejor.** `muestra/gr.png` tiene 433×505 de sujeto
   útil y se escala 2.6× para llegar a la resolución de render: está blanda si la
   mirás al 100%. El grano y la curva de negros lo disimulan a tamaño de
   Instagram, pero nada en el sistema lo compensa de verdad.
 
-El invitado va **anclado arriba**, no abajo. Medido: la cara arranca al 13.8%
-del alto contra 12-17% de las cinco originales. Anclado abajo arrancaba al 27% y
-la persona quedaba colgando.
+El invitado va **centrado** y **anclado arriba**. El cuadro de la foto mide el
+94% del alto del lienzo y va pegado abajo, así que su borde superior cae al 6%,
+que es donde arranca la coronilla en la referencia. Anclado abajo la cara
+arrancaba al 27% y la persona quedaba colgando.
+
+Se escala por **alto**, no por ancho. Por ancho, el tamaño final dependía de
+cuán abierto estuviera el plano de origen: con los brazos cruzados la silueta es
+ancha, se achicaba para entrar, y la persona quedaba baja. Por alto, una foto de
+busto y una de medio cuerpo llegan las dos a la misma altura de cabeza.
 
 ### Cómo se resuelve la base
 
-En las placas originales, la base del invitado la tapa una bandera de tela que
-cruza en diagonal por abajo. Nosotros usamos el wordmark limpio, que es un
-rectángulo mucho más chico y no tapa nada — así que el invitado quedaba cortado
-en una línea horizontal recta, que es donde está cortada la foto de origen.
+El invitado tiene que apoyarse en algo o se lee como un recorte pegado encima.
+En las placas originales lo resuelve una bandera de tela que cruza en diagonal
+por abajo y le tapa el cuerpo.
 
-Lo resuelve **`desvanecidoBase`** (default 0.28): un degradado sobre el alfa que
-disuelve al invitado en el negro. Dos cosas que costaron encontrar:
+Acá lo resuelve el **layout**, no un objeto: el nombre va centrado abajo y se le
+apoya encima del torso, y de ahí para abajo el cuerpo se disuelve en negro con
+**`desvanecidoBase`** (default 0.3), un degradado sobre el alfa. Se intentó
+replicar la bandera —primero componiendo formas, después simulando tela con
+Three.js y capturándola en Chrome headless— y las dos veces salió peor que no
+tenerla: la simulación da la geometría pero no el material, y una malla lisa con
+dos luces direccionales es una sábana, no una bandera. El problema real no era
+que faltara un objeto sino que el encuadre no cerraba.
+
+Dos cosas del degradado que costaron encontrar:
 
 - **Va anclado al borde inferior del sujeto, no al del cuadro.** Salvo que la
   persona llegue justo al piso, entre las dos hay transparencia y un degradado
   desde el piso del cuadro se gasta entero sobre esa nada.
-- **Cada degradado necesita su propia pasada de `dest-in`.** Meter el de la
-  izquierda y el de la base en un mismo SVG con `mix-blend-mode:multiply` no
+- **Cada degradado necesita su propia pasada de `dest-in`.** Meter el de los
+  costados y el de la base en un mismo SVG con `mix-blend-mode:multiply` no
   funciona: librsvg lo ignora y el segundo pinta encima del primero, con lo que
   reaparece el rectángulo del cuadro.
 
@@ -156,9 +170,9 @@ Archivo wdth 125             0.087   ← lo que usábamos
 ```
 
 Con Archivo 125 el nombre ocupaba 10.9% del alto contra 18.7% de la referencia,
-y no había ajuste que lo arreglara: `tamanoNombre()` sólo puede achicar. Con
+y no había ajuste que lo arreglara: `maquetarNombre()` sólo puede achicar o partir en dos. Con
 Anton llega a 16.3% sin mover una medida del layout — y cerró casi todo el hueco
-que había entre el rol y la caja de datos, porque ese hueco *era* el nombre
+que había entre el rol y la barra de datos, porque ese hueco *era* el nombre
 siendo chico.
 
 Anton es además, casi con seguridad, la fuente de las placas originales. Ya
@@ -213,7 +227,7 @@ el render a 1.45s— y porque horneada, un agente que arma placas no puede tocar
 marca sin querer.
 
 **La capa variable** es lo único que cambia: la foto y cinco textos —etiqueta de
-género, nombre, rol, fecha y hora— más la caja de datos que los contiene.
+género, nombre, rol, fecha y hora— más la barra de datos que los contiene.
 
 Si tocás algo de la capa fija, corré `npm run hornear`. Si te olvidás, `npm test`
 falla y te lo dice: una capa horneada se desactualiza en silencio, y ese test es
@@ -230,7 +244,7 @@ horneada coincida con lo que produce el código hoy, y que la validación rechac
 los casos que antes producían placas rotas en silencio.
 
 Se verificaron mutando el código —cambiar la opacidad del fondo, el gris del
-nombre y la posición de la caja de datos hacen fallar la suite—, no sólo mirando
+nombre y la posición de la barra de datos hacen fallar la suite—, no sólo mirando
 que pasen.
 
 ## El fondo
@@ -272,14 +286,14 @@ nombre del programa.
 
 ## Lo que falta
 
-- **Queda algo de hueco entre el rol y la caja de datos.** Era un tercio de la
+- **Queda algo de hueco entre el rol y la barra de datos.** Era un tercio de la
   placa; con Anton bajó bastante, pero el nombre sigue en 16.3% contra 18.7% de
   la referencia y se nota. La palanca que falta es el ancho de la columna del
   nombre: en Veiras el nombre llega al 55% del ancho y el invitado arranca al
   64%; en la nuestra es 50% y 57%.
 - **El rol corta mal.** "CEO & Founder @Vercel / Creador" / "de Next.js" deja la
   barra huérfana al final de la primera línea. Nadie decidió dónde parte.
-- **El borde de la caja de datos está al 10% de opacidad** y casi no se ve, para
+- **El borde de la barra de datos está al 10% de opacidad** y casi no se ve, para
   ser lo que dice cuándo es el evento.
 - **El recorte de la foto no vive acá** y es el hueco más grande. Ver el
   contrato de arriba.

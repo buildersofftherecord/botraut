@@ -9,6 +9,22 @@ import sharp from "sharp";
  *
  * La foto tiene que llegar **ya recortada**, con fondo transparente. Esto no
  * recorta.
+ *
+ * ── El encuadre cambió con el layout centrado ──
+ *
+ * Antes el invitado era una columna a la derecha y se escalaba por el **ancho**
+ * del cuadro. Ahora es el elemento dominante, centrado y a sangre por abajo, y
+ * se escala por el **alto**. No es lo mismo: escalar por ancho hacía que el
+ * tamaño final dependiera de cuán abierto estuviera el plano de origen —con los
+ * brazos cruzados la silueta es ancha, se achicaba para entrar, y la persona
+ * quedaba baja. Por alto, una foto de busto y otra de medio cuerpo llegan las
+ * dos a la misma altura de cabeza.
+ *
+ * Lo que **no** resuelve escalar por alto es de dónde a dónde va el encuadre:
+ * un plano entero llevado al alto del cuadro da una cabeza chica, y uno de
+ * busto da una cabeza grande. Eso es criterio, no aritmética, y es lo que va a
+ * decidir el modelo de visión: mira la foto y devuelve dónde está la cabeza.
+ * Hasta entonces `escalaSujeto` se pasa desde afuera.
  */
 export type OpcionesRetrato = {
   /** Ancho del cuadro de destino, en píxeles ya multiplicados por el supermuestreo. */
@@ -16,15 +32,20 @@ export type OpcionesRetrato = {
   /** Alto del cuadro de destino, ídem. */
   alto: number;
   /**
-   * Qué fracción del ancho del cuadro ocupa el sujeto. Arriba de 1 el sujeto
-   * se sale por los costados, que es lo que hacen las placas de referencia:
-   * la persona sangra por el borde derecho en vez de quedar contenida en una
-   * columna. Contenida se lee como recorte pegado encima.
+   * Qué fracción del **alto** del cuadro ocupa la silueta.
    *
-   * El default tiene que coincidir con el de `--escala` en `generar.ts`. Estuvo
-   * en 1 mientras el CLI pasaba 1.15, y el resultado fue que un script que
-   * llamaba a esta función sin el parámetro producía una placa distinta a la
-   * del CLI con los mismos datos.
+   * En 1 la persona va del borde superior del cuadro al inferior. Arriba de 1
+   * se sale por abajo, que es lo que hace la referencia: el torso sangra por el
+   * borde en vez de terminar adentro. Terminado adentro se lee como recorte
+   * pegado encima.
+   *
+   * El default 0.75 sale de comparar renders a 0.65, 0.75 y 0.85 con la foto de
+   * muestra: a 0.65 el invitado flota en el aire de arriba, a 0.85 la cabeza se
+   * sube y el nombre le cruza el brazo en vez del pecho.
+   *
+   * **Tiene que coincidir con `ESCALA_SUJETO` en `lib/placa.ts`.** Cuando no
+   * coincidían, un script que llamaba a esta función sin el parámetro producía
+   * una placa distinta a la del bot con los mismos datos.
    */
   escalaSujeto?: number;
   /**
@@ -37,57 +58,59 @@ export type OpcionesRetrato = {
    */
   gamma?: number;
   /**
-   * Ancho del desvanecido sobre el borde izquierdo, en fracción del cuadro.
-   * La persona emerge de la oscuridad en vez de arrancar con un canto duro
-   * contra la columna del nombre.
+   * Ancho del desvanecido sobre **cada** borde lateral, en fracción del cuadro.
+   *
+   * Simétrico, porque el sujeto ahora está centrado. Antes era sólo el borde
+   * izquierdo, contra la columna del nombre; en un plano centrado los dos lados
+   * son el mismo caso — los hombros que sangran por izquierda y por derecha
+   * tienen que disolverse igual.
    */
   desvanecido?: number;
   /**
    * Alto del desvanecido sobre el borde inferior, en fracción del cuadro.
    *
-   * En las placas originales la base de la persona la tapa la bandera de tela,
-   * que cruza en diagonal por abajo. Nosotros usamos el wordmark limpio, que es
-   * un rectángulo mucho más chico y no llega a cubrir: el invitado queda
-   * cortado a filo por el borde del lienzo. Esto lo disuelve en el negro en vez
-   * de cortarlo.
+   * Es la pieza que hace que el invitado no flote. El nombre se le apoya encima
+   * del torso y de ahí para abajo el cuerpo se disuelve en negro: por eso no
+   * hace falta ningún objeto —bandera ni nada— tapando la base. Sin esto, la
+   * foto de origen (cortada al pecho) termina en una línea horizontal recta a
+   * cualquier escala, y esa línea es exactamente lo que delata el recorte.
    */
   desvanecidoBase?: number;
 };
 
 export async function prepararRetrato(
   entrada: Buffer,
-  { ancho, alto, escalaSujeto = 1.15, gamma = 1.35, desvanecido = 0.14, desvanecidoBase = 0.28 }: OpcionesRetrato,
+  { ancho, alto, escalaSujeto = 0.75, gamma = 1.35, desvanecido = 0.06, desvanecidoBase = 0.3 }: OpcionesRetrato,
 ): Promise<Buffer> {
   // 1. Recorte al sujeto. `trim` sobre el alfa saca el aire que dejó el
   //    recortador, que si no se cuenta como parte de la foto y descentra todo
   //    el encuadre — el sujeto termina corrido y más chico de lo pedido.
   const alSujeto = await sharp(entrada).ensureAlpha().trim({ threshold: 1 }).png().toBuffer();
 
-  // 2. Escala. El alto se deriva del ancho para no deformar; que sobre o falte
-  //    alto respecto del cuadro se resuelve en el pegado, no estirando.
-  const anchoSujeto = Math.round(ancho * escalaSujeto);
+  // 2. Escala por alto. El ancho se deriva para no deformar; que sobre ancho
+  //    respecto del cuadro se resuelve recortando en el pegado, no estirando.
+  const altoSujeto = Math.round(alto * escalaSujeto);
   const escalado = await sharp(alSujeto)
-    .resize({ width: anchoSujeto, kernel: sharp.kernel.lanczos3 })
+    .resize({ height: altoSujeto, kernel: sharp.kernel.lanczos3 })
     .grayscale()
     .gamma(gamma)
     .png()
     .toBuffer();
   const m = await sharp(escalado).metadata();
-  const altoSujeto = m.height ?? alto;
+  const anchoSujeto = m.width ?? ancho;
 
-  // 3. Pegado al cuadro: anclado **arriba** y a la derecha.
+  // 3. Pegado al cuadro: **centrado** en horizontal y anclado arriba.
   //
-  //    Arriba, no abajo. La primera versión anclaba al piso y el invitado
-  //    quedaba colgando: medido, la cara arrancaba al 27% del alto de la placa
-  //    contra el 12%-17% de las cinco referencias. Anclado arriba la cabeza
-  //    llega donde tiene que llegar y el torso se va por el borde inferior, que
-  //    es lo que en las originales lo mete **detrás** de la bandera en vez de
-  //    dejarlo al lado.
+  //    Arriba, no abajo. Anclado al piso el invitado queda colgando: medido, la
+  //    cara arrancaba al 27% del alto de la placa contra el 6% de la
+  //    referencia. Anclado arriba la coronilla llega donde tiene que llegar y
+  //    el torso se va por el borde inferior, que es donde el nombre se le apoya
+  //    encima.
   //
   //    Lo que sobra se recorta antes de pegar, no se pega con offset negativo:
   //    `composite` de sharp sólo acepta offsets positivos, así que el desborde
-  //    se resuelve con `extract`. Se recorta por abajo y por la izquierda, que
-  //    es lo que sangra en la referencia.
+  //    se resuelve con `extract`. Se recorta por igual de los dos lados para
+  //    que el centro del sujeto siga siendo el centro del cuadro.
   const anchoVisible = Math.min(anchoSujeto, ancho);
   const altoVisible = Math.min(altoSujeto, alto);
   const visible =
@@ -95,7 +118,7 @@ export async function prepararRetrato(
       ? escalado
       : await sharp(escalado)
           .extract({
-            left: anchoSujeto - anchoVisible,
+            left: Math.round((anchoSujeto - anchoVisible) / 2),
             top: 0,
             width: anchoVisible,
             height: altoVisible,
@@ -106,7 +129,7 @@ export async function prepararRetrato(
   const cuadro = await sharp({
     create: { width: ancho, height: alto, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
   })
-    .composite([{ input: visible, left: ancho - anchoVisible, top: 0 }])
+    .composite([{ input: visible, left: Math.round((ancho - anchoVisible) / 2), top: 0 }])
     .png()
     .toBuffer();
 
@@ -138,6 +161,8 @@ export async function prepararRetrato(
             `<linearGradient id="g" x1="0" x2="1">
                <stop offset="0" stop-color="#fff" stop-opacity="0"/>
                <stop offset="${desvanecido}" stop-color="#fff" stop-opacity="1"/>
+               <stop offset="${1 - desvanecido}" stop-color="#fff" stop-opacity="1"/>
+               <stop offset="1" stop-color="#fff" stop-opacity="0"/>
              </linearGradient>
              <rect width="100%" height="100%" fill="url(#g)"/>`,
           ),
@@ -153,10 +178,6 @@ export async function prepararRetrato(
     // cuadro. Salvo que la persona llegue justo al piso, entre las dos hay
     // transparencia, y un degradado desde el piso del cuadro se gasta entero
     // sobre esa nada: el canto de la foto queda intacto más arriba.
-    //
-    // Y ese canto siempre existe: la foto de origen está cortada al pecho, así
-    // que el sujeto termina en una línea horizontal recta a cualquier escala.
-    // Es exactamente lo que hay que disolver.
     const largo = Math.round(alto * desvanecidoBase);
     const desde = Math.max(0, altoVisible - largo);
     salida = await sharp(salida)

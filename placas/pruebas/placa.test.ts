@@ -12,7 +12,7 @@ async function placaDeMuestra(): Promise<Buffer> {
   const l = LIENZOS["1:1"];
   const datos = validarDatos(JSON.parse(await readFile("muestra/gr.json", "utf8")));
   const foto = await prepararRetrato(await readFile("muestra/gr.png"), {
-    ancho: Math.round(l.ancho * l.fotoAncho * S),
+    ancho: l.ancho * S,
     alto: altoDeFoto(l) * S,
   });
   return renderizar(datos, "1:1", foto);

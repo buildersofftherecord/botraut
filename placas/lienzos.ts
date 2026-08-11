@@ -1,58 +1,57 @@
 export type Lienzo = {
   ancho: number;
   alto: number;
-  /** Margen del marco HUD, en px. */
+  /**
+   * Margen del HUD contra el borde del lienzo, en px. Sólo lo usan `REC ●` y
+   * el timecode: son marcas de encuadre y tienen que ir pegadas al filo.
+   *
+   * El contenido usa `contenidoMargen`, que es mucho mayor. Que sean dos
+   * márgenes distintos es deliberado: el HUD pertenece al borde, el contenido
+   * a la caja de texto.
+   */
   margen: number;
   /**
-   * Cuerpo *máximo* del nombre del invitado, en px. `tamanoNombre()` lo achica
-   * por debajo de este techo cuando la palabra más larga del nombre no entraría
-   * en la columna reservada.
+   * Margen lateral del bloque de contenido, en px.
    *
-   * Con Anton, el techo sólo manda en los nombres **cortos**. Medido sobre la
-   * columna de 481px del 1:1: GUILLERMO entra a 120px y FRANCISCO a 123 — los
-   * ata la columna, no el techo. NAOMI entra a 201 y ONEGA a 207, y ahí sí
-   * manda el techo. O sea que este número decide cuán grande se ve un nombre
-   * corto, no el tamaño general.
+   * Nombre, rol y barra de datos comparten **el mismo ancho**, y este número
+   * es lo que lo define. Que compartan ancho no es cosmético: es lo que hace
+   * que el pie lea como un bloque y no como tres elementos sueltos que
+   * casualmente están cerca.
+   *
+   * También es el ancho contra el que se mide el nombre. Antes el nombre se
+   * medía contra la columna izquierda y la caja de datos tenía su propio ancho
+   * fijo, así que nada garantizaba que se alinearan.
+   */
+  contenidoMargen: number;
+  /**
+   * Cuerpo *máximo* del nombre, en px.
+   *
+   * Con el nombre en una línea sobre 824px, el techo sólo manda en los nombres
+   * cortos: "GUILLERMO RAUCH" entra a 124 y "FRANCISCO VEIRAS" a 125 — los ata
+   * el ancho, no el techo. "NAOMI ONEGA" entra a 167 y "BOB" a 583, y ahí sí
+   * manda. O sea que este número decide cuánto puede crecer un nombre corto.
+   *
+   * 150 y no más: arriba de eso un apellido corto se come el rol y la barra.
    */
   nombreTamano: number;
+  /**
+   * Piso del nombre en una línea, en px. Por debajo de esto se parte en dos.
+   *
+   * No es un mínimo de legibilidad —a 83px se lee perfecto— sino de **forma**:
+   * un nombre de 24 caracteres estirado sobre los 824px queda como una cinta
+   * fina y deja de leerse como titular. Medido: "Juan Cruz Fernandez Ruiz" da
+   * 83 en una línea y 101 partido en dos.
+   *
+   * 100 es el corte: deja en una línea todo lo que llega hasta ~19 caracteres
+   * —que incluye los dos casos reales, Rauch y Veiras— y parte lo que no.
+   */
+  nombreMinimo: number;
   /** Cuerpo del rol, en px. */
   rolTamano: number;
-  /** Fracción del ancho total que ocupa la foto. */
-  fotoAncho: number;
-  /**
-   * Ancho del logo de abajo a la derecha, en px.
-   *
-   * No es decorativo: en las placas de referencia la bandera **cruza el borde
-   * donde arranca la foto**, y eso es lo que ata a la persona a la placa en vez
-   * de dejarla flotando como un recorte pegado. Para que cumpla esa función
-   * tiene que ser más ancho que la distancia entre su borde derecho y el
-   * comienzo de la foto: con `fotoAncho` 0.48 y márgenes de 40+20, eso es
-   * cualquier valor arriba de ~460 en 1080.
-   */
-  /**
-   * Ancho del wordmark, en px.
-   *
-   * El 1:1 usa 320 y los demás siguen en 400-460: se bajó mirando renders
-   * reales. A 440 el logo competía con la caja de datos por el peso de la
-   * mitad inferior. Los otros lienzos no están calibrados, así que se dejaron
-   * como estaban en vez de arrastrarles un número elegido para el cuadrado.
-   */
+  /** Ancho del wordmark centrado al pie, en px. */
   logoAncho: number;
-  /**
-   * Ancho fijo de la caja de datos, en px.
-   *
-   * Fijo, no derivado del contenido. Antes la caja se dimensionaba por su texto
-   * más largo, así que `"JUEVES 6 DE AGOSTO"` y `"JUEVES 30 DE SEPTIEMBRE"`
-   * daban cajas de ancho distinto y la composición se corría de semana a
-   * semana. Un ancho fijo es lo que permite hornear el marco en la capa fija, y
-   * además es lo que hace que la placa sea el mismo template todas las veces.
-   *
-   * El 480 sale del peor caso realista: el programa es siempre un jueves, y
-   * `"JUEVES 30 DE SEPTIEMBRE"` mide 346px en IBM Plex Mono a 20px con el
-   * tracking del HUD. Más el ícono, el separador, los gaps y el padding da 480,
-   * y hasta donde arranca la foto hay 494.
-   */
-  cajaAncho: number;
+  /** Alto de la barra de datos, en px. */
+  barraAlto: number;
 };
 
 /**
@@ -60,24 +59,36 @@ export type Lienzo = {
  * día uno: agregar un formato es agregar una fila acá, no rediseñar el
  * template. Los valores de los otros tres son un punto de partida y hay que
  * ajustarlos a ojo cuando se activen.
+ *
+ * Los números del 1:1 salen de medir la placa de referencia normalizada a
+ * 1080, no de estimar: la barra de datos arranca al 12.3% del ancho (→ 128 de
+ * margen) y el nombre ocupa el 75.6% (→ 824, que es exactamente el ancho de
+ * contenido). Que el nombre y la barra midan lo mismo en la referencia es lo
+ * que confirmó que comparten margen.
  */
 export const LIENZOS = {
-  "1:1": { ancho: 1080, alto: 1080, margen: 40, nombreTamano: 200, rolTamano: 25, fotoAncho: 0.48, logoAncho: 320, cajaAncho: 550 },
-  "4:5": { ancho: 1080, alto: 1350, margen: 44, nombreTamano: 210, rolTamano: 26, fotoAncho: 0.46, logoAncho: 440, cajaAncho: 480 },
-  "9:16": { ancho: 1080, alto: 1920, margen: 48, nombreTamano: 220, rolTamano: 28, fotoAncho: 0.5, logoAncho: 460, cajaAncho: 500 },
-  "16:9": { ancho: 1280, alto: 720, margen: 32, nombreTamano: 142, rolTamano: 20, fotoAncho: 0.38, logoAncho: 400, cajaAncho: 380 },
+  "1:1":  { ancho: 1080, alto: 1080, margen: 40, contenidoMargen: 128, nombreTamano: 150, nombreMinimo: 100, rolTamano: 26, logoAncho: 300, barraAlto: 62 },
+  "4:5":  { ancho: 1080, alto: 1350, margen: 44, contenidoMargen: 128, nombreTamano: 150, nombreMinimo: 100, rolTamano: 27, logoAncho: 310, barraAlto: 64 },
+  "9:16": { ancho: 1080, alto: 1920, margen: 48, contenidoMargen: 132, nombreTamano: 155, nombreMinimo: 104, rolTamano: 28, logoAncho: 320, barraAlto: 66 },
+  "16:9": { ancho: 1280, alto: 720,  margen: 32, contenidoMargen: 150, nombreTamano: 108, nombreMinimo: 74,  rolTamano: 20, logoAncho: 240, barraAlto: 50 },
 } as const satisfies Record<string, Lienzo>;
 
 export type NombreLienzo = keyof typeof LIENZOS;
 
+/** Ancho que comparten el nombre, el rol y la barra de datos. */
+export function anchoContenido(lienzo: Lienzo): number {
+  return lienzo.ancho - lienzo.contenidoMargen * 2;
+}
+
 /**
  * La silueta no llega al alto completo del lienzo: queda por debajo del borde
- * superior para que el marco HUD respire.
+ * superior para que el HUD respire. En la referencia la coronilla arranca al
+ * 6% del alto, y de ahí sale el 0.94.
  */
 const PROPORCION_ALTO_FOTO = 0.94;
 
 /**
- * A qué alto real se lleva la silueta en un lienzo dado.
+ * A qué alto real se lleva el cuadro de la foto en un lienzo dado.
  *
  * Vive acá y no en `generar.ts` porque `lib/foto.ts` necesita el mismo número
  * para decidir si una silueta tiene resolución suficiente. Cuando estaban
