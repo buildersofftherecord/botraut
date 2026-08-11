@@ -49,7 +49,14 @@ alto de la cabeza, o sea ~4% de tamaño.
       `lienzos.ts` con números de partida y **no hay que exponerlos** hasta
       ajustarlos a ojo.
 
-## 4. Deuda conocida
+## 4. Nota sobre `marca/`
+
+No es código muerto aunque producción no lo alcance: es la referencia de marca,
+y ahí viven las **cinco placas originales** que medio proyecto cita para
+justificar decisiones de diseño. Se borró una vez por confundir "nadie lo
+importa" con "no sirve". Ver `marca/README.md`.
+
+## 5. Deuda conocida
 
 - [ ] `salidas/` son ~35 MB de renders sueltos. Está gitignoreado, así que es
       basura local nomás, pero conviene vaciarlo cada tanto.
