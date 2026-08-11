@@ -2,11 +2,11 @@ import type { ModelMessage } from "ai";
 import { Chat, type Thread, type Message } from "chat";
 import { createSlackAdapter } from "@chat-adapter/slack";
 import { createRedisState } from "@chat-adapter/state-redis";
-import { validarFoto } from "./lib/foto";
-import { FotoSchema } from "./lib/tipos";
-import { EstadoThreadSchema } from "./lib/estado";
-import { extraerFotoAdjunta, FOTO_SIN_URL, FOTO_SIN_DESCARGAR, nombreArchivoPlaca } from "./lib/mensajes";
-import { crearAgente, type Conversacion } from "./lib/agente";
+import { validarFoto } from "./foto";
+import { FotoSchema } from "./tipos";
+import { EstadoThreadSchema } from "./estado";
+import { extraerFotoAdjunta, FOTO_SIN_URL, FOTO_SIN_DESCARGAR, nombreArchivoPlaca } from "./mensajes";
+import { crearAgente, type Conversacion } from "./agente";
 
 export const bot = new Chat({
   userName: "botraut",

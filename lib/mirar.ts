@@ -1,8 +1,6 @@
 import { generateObject } from "ai";
-import { google } from "@ai-sdk/google";
 import { z } from "zod";
-
-const MODELO = process.env.MODELO_VISION ?? "gemini-3.5-flash";
+import { modelo } from "./modelos";
 
 export type Veredicto = { sirve: true } | { sirve: false; motivo: string };
 
@@ -68,7 +66,7 @@ como "la imagen no cumple los requisitos" ni jerga técnica.`;
 /** Le muestra la silueta ya recortada al modelo y le pide un veredicto. */
 export async function mirarSilueta(png: Buffer): Promise<Veredicto> {
   const { object } = await generateObject({
-    model: google(MODELO),
+    model: modelo("vision"),
     schema: RespuestaSchema,
     instructions: PROMPT,
     messages: [

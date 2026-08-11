@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { bot } from "@/bot";
+import { bot } from "@/lib/bot";
 
 /**
  * `bot.webhooks.slack` ya responde 200 sin esperar al handler (fire-and-forget

@@ -1,8 +1,6 @@
 import { generateObject } from "ai";
-import { google } from "@ai-sdk/google";
 import { CopySchema, type Copy } from "./tipos";
-
-const MODELO = process.env.MODELO_COPY ?? "gemini-3.5-flash-lite";
+import { modelo } from "./modelos";
 
 /**
  * El spike de la Task 14 midió que el modelo inventa antes que admitir que no
@@ -36,7 +34,7 @@ No devuelvas el nombre: ya lo tenemos.`;
 
 export async function buscarCopy(nombre: string): Promise<Copy> {
   const { object } = await generateObject({
-    model: google(MODELO),
+    model: modelo("copy"),
     schema: CopySchema,
     instructions: PROMPT,
     prompt: `La persona es: ${nombre}`,
@@ -55,7 +53,7 @@ export async function rehacerCopy(
   correccion: string,
 ): Promise<Copy> {
   const { object } = await generateObject({
-    model: google(MODELO),
+    model: modelo("copy"),
     schema: CopySchema,
     instructions: PROMPT,
     prompt:

@@ -1,8 +1,8 @@
 import { generateObject } from "ai";
-import { google } from "@ai-sdk/google";
 import { z } from "zod";
 import sharp from "sharp";
 import { medidaCoherente, type MedidaCara } from "../placas/encuadre";
+import { modelo } from "./modelos";
 
 /**
  * Dónde está la cara en la foto del invitado, medida por un modelo con visión.
@@ -25,17 +25,6 @@ import { medidaCoherente, type MedidaCara } from "../placas/encuadre";
  * porque se cayó una API de visión sería peor que una placa con el encuadre
  * genérico.
  */
-
-/**
- * El modelo. Sale del entorno para poder cambiarlo sin tocar código: si el
- * encuadre sale flojo, subir a uno más potente es una variable, no un deploy
- * distinto.
- *
- * `gemini-3.5-flash-lite` es el mismo que usa el resto del bot y alcanza:
- * medido cuatro veces sobre la referencia, la línea de los ojos dio 25.5, 25.7,
- * 25.7 y 25.7 — más firme que lo que se puede medir a ojo.
- */
-const MODELO = process.env.MODELO_ENCUADRE ?? process.env.MODELO_COPY ?? "gemini-3.5-flash-lite";
 
 /**
  * Coordenadas de 0 a 1000, que es la convención con la que estos modelos están
@@ -90,7 +79,7 @@ async function paraMedir(foto: Buffer): Promise<Buffer> {
 export async function medirCara(fotoRecortada: Buffer): Promise<MedidaCara | undefined> {
   try {
     const { object } = await generateObject({
-      model: google(MODELO),
+      model: modelo("encuadre"),
       schema: RespuestaSchema,
       messages: [
         {

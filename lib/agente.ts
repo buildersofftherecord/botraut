@@ -1,21 +1,12 @@
 import { ToolLoopAgent, tool } from "ai";
-import { google } from "@ai-sdk/google";
 import { z } from "zod";
+import { modelo } from "./modelos";
 import { buscarCopy } from "./buscar";
 import { generarPlaca } from "./generar";
 import { ESCALA_SUJETO } from "./placa";
 import { InvitadoSchema } from "./tipos";
 import { NO_ENCONTRADO } from "./mensajes";
 import { EstadoThreadSchema } from "./estado";
-
-/**
- * `gemini-3.6-flash` tiene 20 pedidos por dia en el tier gratis, y un agente
- * gasta varios por conversacion: se agotaba antes de la segunda placa.
- * `gemini-3.5-flash-lite` responde y llama herramientas bien — probado contra
- * la API real, armo un generar_placa completo a partir de una conversacion
- * desordenada.
- */
-const MODELO = process.env.MODELO_COPY ?? "gemini-3.5-flash-lite";
 
 /**
  * Lo mínimo que el agente necesita del thread. Se define acá y no se importa
@@ -159,7 +150,7 @@ export function crearHerramientas(conv: Conversacion) {
 
 export function crearAgente(conv: Conversacion) {
   return new ToolLoopAgent({
-    model: google(MODELO),
+    model: modelo("agente"),
     instructions: INSTRUCCIONES,
     tools: crearHerramientas(conv),
   });
