@@ -92,9 +92,12 @@ export type OpcionesRetrato = {
    * nombre se apoya sobre el pecho a propósito— y por eso el desvanecido
    * empieza más arriba en vez de cortar seco.
    *
-   * 0.76 es donde arranca el rol. Ahora el cuadro **es** el lienzo, así que la
-   * fracción es directa y no hay que convertirla — antes el cuadro medía el 94%
-   * y este número era 0.74, con la conversión escrita a mano.
+   * 0.65 es la mitad del nombre. Estuvo en 0.76 —donde arranca el rol— y ahí el
+   * cuerpo seguía visible por detrás del nombre entero y hasta debajo de él: el
+   * pie quedaba apoyado sobre torso en vez de sobre negro. Cortando a media
+   * altura del nombre, la mitad de arriba de las letras se apoya sobre el
+   * pecho (que es lo que ancla al invitado) y de ahí para abajo es negro
+   * limpio.
    */
   pisoTexto?: number;
   /**
@@ -130,7 +133,7 @@ export async function prepararRetrato(
   entrada: Buffer,
   { ancho, alto, escalaSujeto = 0.75, gamma = 1.35, desvanecido = 0.06,
     desvanecidoBase = 0.15,
-    pisoTexto = 0.76,
+    pisoTexto = 0.65,
     desplazamiento = { x: 0, y: 0.06 },
     cara,
   }: OpcionesRetrato,

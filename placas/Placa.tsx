@@ -45,7 +45,29 @@ const aca = dirname(fileURLToPath(import.meta.url));
  * más aire abajo que arriba, o se lee cayéndose de la placa. En la referencia
  * quedó en 44 y ahí se ve apretado.
  */
-const AIRE = { rol: 30, barra: 34, logo: 38, pie: 56 } as const;
+const AIRE = { rol: 24, barra: 27, logo: 30, pie: 56 } as const;
+
+/**
+ * Cuánto del alto del lienzo cubre el velo negro del pie, desde abajo.
+ *
+ * El velo hace algo que el desvanecido del retrato **no puede**: el desvanecido
+ * saca a la persona, pero el fondo sigue ahí, así que la trama BO/TR se veía por
+ * detrás de la barra de datos y del wordmark y el pie no leía negro.
+ *
+ * 0.35 arranca al 65% del alto, que es la mitad del nombre — el mismo punto
+ * donde corta `pisoTexto`. Medido sobre el fondo del pie, la luminancia pasa de
+ * 10 a 0; detrás del rol queda en 4 y detrás de la barra en 2.
+ *
+ * Se probó también a 0.45 y 0.55: el pie queda igual de negro en los tres, lo
+ * único que cambia es cuánta trama sobrevive en la banda del medio. 0.35 es el
+ * que más deja.
+ *
+ * **No reemplaza a `pisoTexto`.** Ese es una garantía estructural, con test
+ * detrás: que el cuerpo no invada la zona del texto pase lo que pase con la
+ * escala que mande el agente. El velo es lo que además lo hace ver negro. Uno
+ * es corrección, el otro es apariencia.
+ */
+const VELO_DESDE = 0.35;
 
 /**
  * Geometría interna de la barra de datos, en px nominales.
@@ -148,6 +170,23 @@ export async function renderizarConFactor(
             }}
           />
         ) : null}
+
+        {/* El velo: degradado a negro sobre el pie. Va **encima de la foto** y
+            debajo del texto — encima, porque si fuera parte del fondo horneado
+            el retrato lo taparía y volveríamos a tener textura detrás de la
+            barra de datos. */}
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            bottom: 0,
+            width: l.ancho,
+            height: l.alto * VELO_DESDE,
+            display: "flex",
+            backgroundImage:
+              "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 60%, rgba(0,0,0,1) 100%)",
+          }}
+        />
 
         {/* El pie: una sola columna centrada, anclada abajo. Nombre, rol,
             barra y wordmark comparten eje y —nombre y barra— ancho. */}

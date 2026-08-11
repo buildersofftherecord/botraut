@@ -22,7 +22,7 @@ async function alfaEnFila(retrato: Buffer, fraccionDelCuadro: number): Promise<n
   return suma / n / 255;
 }
 
-const PISO = 0.76;
+const PISO = 0.65;
 
 /**
  * Una foto de prueba: gris opaco con una fila blanca en `marcaEn`.
@@ -173,9 +173,11 @@ describe("prepararRetrato — el piso del texto", () => {
       ancho: ANCHO,
       alto: ALTO,
     });
-    // Sin conversión: el cuadro es el lienzo, así que 0.70 del cuadro es 0.70
-    // del lienzo, que es donde cae el nombre.
-    expect(await alfaEnFila(retrato, 0.7)).toBeGreaterThan(0.2);
+    // La **mitad de arriba** del nombre, que arranca al 60%. El corte va a la
+    // mitad del nombre (0.65), así que abajo de eso es negro a propósito: lo
+    // que no puede pasar es que también desaparezca arriba, porque ahí es donde
+    // el nombre se apoya sobre el pecho.
+    expect(await alfaEnFila(retrato, 0.61)).toBeGreaterThan(0.2);
   }, 30_000);
 
   /**

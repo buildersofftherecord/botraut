@@ -48,7 +48,14 @@ export type Lienzo = {
   nombreMinimo: number;
   /** Cuerpo del rol, en px. */
   rolTamano: number;
-  /** Ancho del wordmark centrado al pie, en px. */
+  /**
+   * Ancho del wordmark centrado al pie, en px.
+   *
+   * También decide **cuán abajo queda todo el pie**. La columna está anclada al
+   * borde inferior y crece hacia arriba, así que achicar el wordmark baja el
+   * bloque entero —nombre, rol y barra— sin tocar ningún otro número. Bajó de
+   * 300 a 265 por eso, no porque el logo se viera grande.
+   */
   logoAncho: number;
   /** Alto de la barra de datos, en px. */
   barraAlto: number;
@@ -67,7 +74,7 @@ export type Lienzo = {
  * que confirmó que comparten margen.
  */
 export const LIENZOS = {
-  "1:1":  { ancho: 1080, alto: 1080, margen: 40, contenidoMargen: 128, nombreTamano: 150, nombreMinimo: 100, rolTamano: 26, logoAncho: 300, barraAlto: 62 },
+  "1:1":  { ancho: 1080, alto: 1080, margen: 40, contenidoMargen: 128, nombreTamano: 150, nombreMinimo: 100, rolTamano: 26, logoAncho: 265, barraAlto: 62 },
   "4:5":  { ancho: 1080, alto: 1350, margen: 44, contenidoMargen: 128, nombreTamano: 150, nombreMinimo: 100, rolTamano: 27, logoAncho: 310, barraAlto: 64 },
   "9:16": { ancho: 1080, alto: 1920, margen: 48, contenidoMargen: 132, nombreTamano: 155, nombreMinimo: 104, rolTamano: 28, logoAncho: 320, barraAlto: 66 },
   "16:9": { ancho: 1280, alto: 720,  margen: 32, contenidoMargen: 150, nombreTamano: 108, nombreMinimo: 74,  rolTamano: 20, logoAncho: 240, barraAlto: 50 },

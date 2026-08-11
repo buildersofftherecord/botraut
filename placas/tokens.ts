@@ -40,11 +40,20 @@ export const COLOR = {
 export const NOMBRE_COLOR = "#ffffff";
 
 /**
- * El wordmark ya no sigue al nombre: con el nombre en 255, igualarlo pondría
- * dos elementos peleando por el máximo. Queda en el gris que el nombre tenía
- * antes, que es donde funcionaba.
+ * El wordmark es el elemento **más callado** de la placa, por debajo del rol.
+ *
+ * El criterio no es estético: el rol es información que alguien tiene que leer
+ * para decidir si mira el programa, y el wordmark es una firma en una placa que
+ * se publica desde la cuenta de BOTR. Al mismo gris que el rol (`#8a8a8a`) los
+ * dos dirían que valen lo mismo.
+ *
+ * Bajó de `#a5a5a5` a `#7a7a7a` cuando entró el velo, y ahí el número importa:
+ * antes se apoyaba sobre un fondo de luminancia 10 y ahora sobre 0, así que el
+ * mismo gris rinde más. Medido, `#7a7a7a` sobre el pie da 4.9:1 — de sobra para
+ * tipografía display en bold. Sin velo ese valor se habría visto apagado, y de
+ * hecho se descartó por eso antes de que el velo existiera.
  */
-export const LOGO_COLOR = "#a5a5a5";
+export const LOGO_COLOR = "#7a7a7a";
 
 /**
  * De `.hud-label` en globals.css, más `--fs-hud` y `--tr-hud`.
@@ -108,12 +117,12 @@ export const FUENTE = {
  * Reemplaza a la lluvia de ceros y unos que usaban las placas viejas. Los
  * números salen de comparar renders reales, no de teoría:
  *
- * - `opacidad: 0.03` — estuvo en 0.02 mientras el nombre iba en la columna
- *   izquierda: ahí la trama tenía que desaparecer para no comerle peso al
- *   titular, y a 0.02 sólo asomaba como ruido de compresión. Con el layout
- *   centrado el nombre se apoya sobre el torso del invitado, no sobre el
- *   fondo, así que la trama puede leerse de verdad — y leyéndose es lo que
- *   evita que el negro quede plano.
+ * - `opacidad: 0.018` — medido contra la referencia, no elegido a ojo. En una
+ *   banda de fondo puro, la trama de la referencia abre 5 niveles de gris
+ *   entre su p10 y su p90; a 0.03 la nuestra abría 9, casi el doble, y por eso
+ *   se leía como una pared de BO/TR en vez de como textura. La trama tiene que
+ *   estar —sin ella el negro queda plano— pero por debajo del umbral en que
+ *   compite con la foto.
  * - `columnas: 5` — a 10 columnas deja de reconocerse "BOTR" y el punto de
  *   usar el logo se pierde. Bajó de 6 a 5 junto con la opacidad: si la trama
  *   se va a ver, el monograma tiene que ser legible como monograma.
@@ -128,7 +137,7 @@ export const FUENTE = {
  */
 export const FONDO = {
   monograma: "botr-monograma-cuadrado-sin-placa-neg.svg",
-  opacidad: 0.03,
+  opacidad: 0.018,
   columnas: 5,
   /** Alfa del grano de `.tv-overlay`, mismo feTurbulence que la landing. */
   grano: 0.055,
